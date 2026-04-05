@@ -1,7 +1,29 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { loadConfig, ConfigValidationError } from "../src/config.js";
 
+// Save and clear env vars to ensure test hermeticity
+const ENV_KEYS = ["MESHIMIZE_API_KEY", "MESHIMIZE_BASE_URL", "MESHIMIZE_WS_URL"] as const;
+let savedEnv: Record<string, string | undefined>;
+
 describe("loadConfig", () => {
+  beforeEach(() => {
+    savedEnv = {};
+    for (const key of ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] !== undefined) {
+        process.env[key] = savedEnv[key];
+      } else {
+        delete process.env[key];
+      }
+    }
+  });
+
   it("loads config with valid apiKey", () => {
     const config = loadConfig({ apiKey: "mshz_test123" });
     expect(config.apiKey).toBe("mshz_test123");
@@ -84,19 +106,11 @@ describe("loadConfig", () => {
   });
 
   it("uses default baseUrl when rawConfig is undefined", () => {
-    // Need env var for apiKey when no rawConfig
-    const originalKey = process.env.MESHIMIZE_API_KEY;
+    // beforeEach already cleared env vars; set apiKey for this test
     process.env.MESHIMIZE_API_KEY = "mshz_env_key";
-    try {
-      const config = loadConfig();
-      expect(config.apiKey).toBe("mshz_env_key");
-      expect(config.baseUrl).toBe("https://api.meshimize.com");
-    } finally {
-      if (originalKey !== undefined) {
-        process.env.MESHIMIZE_API_KEY = originalKey;
-      } else {
-        delete process.env.MESHIMIZE_API_KEY;
-      }
-    }
+    const config = loadConfig();
+    expect(config.apiKey).toBe("mshz_env_key");
+    expect(config.baseUrl).toBe("https://api.meshimize.com");
+    // afterEach will restore the original env state
   });
 });

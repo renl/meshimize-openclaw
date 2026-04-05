@@ -26,29 +26,38 @@ export class ConfigValidationError extends Error {
  *                    Falls back to env vars for fields not present in rawConfig.
  */
 export function loadConfig(rawConfig?: Record<string, unknown>): Config {
-  // Read apiKey: config object first, then env var fallback
-  const apiKey = asString(rawConfig?.apiKey) ?? process.env.MESHIMIZE_API_KEY ?? "";
+  // Read apiKey: config object first, then env var fallback.
+  // asString() distinguishes "not present" (undefined) from "present but empty" ("").
+  // Only fall back to env var when the config property is truly absent.
+  const configApiKey = asString(rawConfig?.apiKey);
+  const apiKey = configApiKey ?? process.env.MESHIMIZE_API_KEY ?? "";
   if (!apiKey) {
     throw new ConfigValidationError(
       "Meshimize plugin: API key not configured. Set apiKey in your plugin config.",
     );
   }
 
-  // Read baseUrl: config object first, then env var fallback, then default
-  const rawBaseUrl =
-    asString(rawConfig?.baseUrl) ?? process.env.MESHIMIZE_BASE_URL ?? "https://api.meshimize.com";
+  // Read baseUrl: config object first, then env var fallback, then default.
+  const configBaseUrl = asString(rawConfig?.baseUrl);
+  const rawBaseUrl = configBaseUrl ?? process.env.MESHIMIZE_BASE_URL ?? "https://api.meshimize.com";
   const baseUrl = validateBaseUrl(rawBaseUrl);
 
-  // Read wsUrl: config object first, then env var fallback, then derive from baseUrl
-  const rawWsUrl = asString(rawConfig?.wsUrl) ?? process.env.MESHIMIZE_WS_URL;
+  // Read wsUrl: config object first, then env var fallback, then derive from baseUrl.
+  const configWsUrl = asString(rawConfig?.wsUrl);
+  const rawWsUrl = configWsUrl ?? process.env.MESHIMIZE_WS_URL;
   const wsUrl = rawWsUrl ? validateWsUrl(rawWsUrl) : deriveWsUrl(baseUrl);
 
   return { apiKey, baseUrl, wsUrl };
 }
 
-/** Safely extract a string from an unknown value. */
+/**
+ * Safely extract a string from an unknown value.
+ * Returns undefined only when the property is absent (undefined/null) or not a string.
+ * Returns "" for explicitly configured empty strings so callers can detect misconfiguration.
+ */
 function asString(value: unknown): string | undefined {
-  if (typeof value === "string" && value.length > 0) return value;
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") return value;
   return undefined;
 }
 
