@@ -33,7 +33,7 @@ export function loadConfig(rawConfig?: Record<string, unknown>): Config {
   const apiKey = configApiKey ?? process.env.MESHIMIZE_API_KEY ?? "";
   if (!apiKey) {
     throw new ConfigValidationError(
-      "Meshimize plugin: API key not configured. Set apiKey in your plugin config.",
+      "Meshimize plugin: API key not configured. Set apiKey in your plugin config or set the MESHIMIZE_API_KEY environment variable.",
     );
   }
 
