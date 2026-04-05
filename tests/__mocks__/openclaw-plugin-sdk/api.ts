@@ -1,0 +1,31 @@
+/**
+ * Mock implementation helpers for the OpenClaw Plugin SDK.
+ *
+ * Provides factory functions to create mock PluginAPI instances for testing.
+ */
+
+import type { PluginAPI, ToolDefinition, ServiceDefinition } from "./types.js";
+
+export interface MockPluginAPI extends PluginAPI {
+  _registeredTools: ToolDefinition[];
+  _registeredServices: ServiceDefinition[];
+  _config: Record<string, unknown>;
+}
+
+export function createMockPluginAPI(config: Record<string, unknown> = {}): MockPluginAPI {
+  const registeredTools: ToolDefinition[] = [];
+  const registeredServices: ServiceDefinition[] = [];
+
+  return {
+    _registeredTools: registeredTools,
+    _registeredServices: registeredServices,
+    _config: config,
+    getConfig: () => config,
+    registerTool: (tool: ToolDefinition) => {
+      registeredTools.push(tool);
+    },
+    registerService: (service: ServiceDefinition) => {
+      registeredServices.push(service);
+    },
+  };
+}
