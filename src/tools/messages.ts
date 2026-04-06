@@ -365,7 +365,7 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
   api.registerTool({
     name: "meshimize_ask_question",
     description:
-      "Ask a membership-resolved Q&A group directly, including the first ask immediately after operator approval. This tool verifies current membership before posting, waits for a live answer in the local buffer, and returns Meshimize authority provenance on success. If no answer arrives in time, it returns recoverable timeout metadata so you can use `meshimize_get_messages` to retrieve a late answer without re-asking. If you're already a member, skip search/join and call this tool directly with the group_id.",
+      "Ask a membership-resolved Q&A group directly, including the first ask immediately after operator approval. This tool verifies current membership before posting, waits for a live answer in the local buffer, and returns the answer on success. If no answer arrives in time, it returns recoverable timeout metadata so you can use `meshimize_get_messages` to retrieve a late answer without re-asking. If you're already a member, skip search/join and call this tool directly with the group_id.",
     parameters: {
       type: "object",
       properties: {
