@@ -12,6 +12,8 @@ import { MeshimizeAPI } from "./api/client.js";
 import { MessageBuffer } from "./buffer/message-buffer.js";
 import { DelegationContentBuffer } from "./buffer/delegation-content-buffer.js";
 import { createWsService } from "./services/ws-manager.js";
+import { createPendingJoinMap, PENDING_JOIN_DEFAULTS } from "./state/pending-joins.js";
+import { registerGroupTools } from "./tools/groups.js";
 
 /**
  * Register the Meshimize plugin with the OpenClaw Gateway.
@@ -42,6 +44,12 @@ export function register(api: PluginAPI): void {
 
   api.registerService(wsService);
 
-  // TODO (Slice 4+): Register 21 tools via api.registerTool(...)
-  // Tools will need: client, messageBuffer, delegationContentBuffer, wsService
+  // Create pending join map for operator-gated join flow
+  const pendingJoins = createPendingJoinMap(PENDING_JOIN_DEFAULTS);
+
+  // Register group tools (7 tools)
+  registerGroupTools(api, { api: client, pendingJoins, wsService });
+
+  // TODO (Slice 5+): Register remaining 14 tools via api.registerTool(...)
+  // Tools will need: client, messageBuffer, delegationContentBuffer, wsService, pendingJoins
 }
