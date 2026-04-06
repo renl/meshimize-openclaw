@@ -15,4 +15,5 @@ export interface PendingJoinRequest {
   owner_display_name: string;
   owner_verified: boolean;
   created_at: string; // ISO 8601
+  expires_at: string; // ISO 8601
 }
