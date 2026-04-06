@@ -131,6 +131,11 @@ describe("loadConfig", () => {
     );
   });
 
+  it("throws for explicitly configured empty wsUrl", () => {
+    expect(() => loadConfig({ apiKey: "mshz_test123", wsUrl: "" })).toThrow(ConfigValidationError);
+    expect(() => loadConfig({ apiKey: "mshz_test123", wsUrl: "" })).toThrow("Invalid wsUrl");
+  });
+
   it("uses default baseUrl when rawConfig is undefined", () => {
     // beforeEach already cleared env vars; set apiKey for this test
     process.env.MESHIMIZE_API_KEY = "mshz_env_key";

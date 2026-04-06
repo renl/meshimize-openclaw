@@ -29,3 +29,12 @@ export function createMockPluginAPI(config: Record<string, unknown> = {}): MockP
     },
   };
 }
+
+/**
+ * Matches the ambient declaration in src/openclaw-plugin-sdk.d.ts for
+ * "openclaw/plugin-sdk/api". Ensures that if production code ever imports
+ * createPluginAPI via the Vitest alias, it resolves to a working mock.
+ */
+export function createPluginAPI(config: Record<string, unknown>): PluginAPI {
+  return createMockPluginAPI(config);
+}

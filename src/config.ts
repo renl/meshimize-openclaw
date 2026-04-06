@@ -46,9 +46,11 @@ export function loadConfig(rawConfig?: Record<string, unknown>): Config {
   const baseUrl = validateBaseUrl(rawBaseUrl);
 
   // Read wsUrl: config object first, then env var fallback, then derive from baseUrl.
+  // Important: treat an explicitly provided empty string as "present but invalid",
+  // not as "absent", so validate whenever rawWsUrl is defined.
   const configWsUrl = asString(rawConfig?.wsUrl, "wsUrl");
   const rawWsUrl = configWsUrl ?? process.env.MESHIMIZE_WS_URL;
-  const wsUrl = rawWsUrl ? validateWsUrl(rawWsUrl) : deriveWsUrl(baseUrl);
+  const wsUrl = rawWsUrl !== undefined ? validateWsUrl(rawWsUrl) : deriveWsUrl(baseUrl);
 
   return { apiKey, baseUrl, wsUrl };
 }
