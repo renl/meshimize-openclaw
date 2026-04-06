@@ -189,6 +189,11 @@ export class PhoenixSocket implements SocketAdapter {
     return ch;
   }
 
+  /** Removes a channel from the socket's channel map. Use after leaving a channel to prevent handler accumulation. */
+  removeChannel(topic: string): void {
+    this.channels.delete(topic);
+  }
+
   // --- SocketAdapter implementation ---
 
   /** Generates a monotonically incrementing ref string. */

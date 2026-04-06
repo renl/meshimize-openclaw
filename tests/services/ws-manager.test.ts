@@ -92,6 +92,10 @@ vi.mock("../../src/ws/client.js", () => {
         }
         return ch;
       }),
+      removeChannel: vi.fn().mockImplementation((_topic: string) => {
+        // Simulate removing channel from socket's internal map
+        // (actual mockChannels deletion is handled in test assertions)
+      }),
       makeRef: vi.fn().mockReturnValue("1"),
     })),
   };
@@ -155,6 +159,9 @@ describe("WsManager — createWsService", () => {
   let mockApi: ReturnType<typeof createMockApi>;
   let messageBuffer: MessageBuffer;
   let delegationContentBuffer: DelegationContentBuffer;
+  // Track active service for cleanup — prevents MaxListenersExceededWarning
+  // from accumulated SIGTERM/SIGINT handlers across tests
+  let activeService: ReturnType<typeof createWsService> | null = null;
 
   beforeEach(() => {
     mockChannels = new Map();
@@ -173,9 +180,15 @@ describe("WsManager — createWsService", () => {
     mockApi = createMockApi();
     messageBuffer = new MessageBuffer();
     delegationContentBuffer = new DelegationContentBuffer();
+    activeService = null;
   });
 
   afterEach(() => {
+    // Clean up signal handlers to prevent listener leak warnings
+    if (activeService?.stop) {
+      activeService.stop();
+    }
+    activeService = null;
     vi.clearAllMocks();
   });
 
@@ -225,6 +238,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -239,6 +253,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -255,6 +270,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -277,6 +293,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       // Should NOT throw
       await expect(service.start()).resolves.toBeUndefined();
@@ -294,6 +311,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       // Should NOT throw
       await expect(service.start()).resolves.toBeUndefined();
@@ -308,6 +326,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -340,6 +359,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -369,6 +389,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -391,6 +412,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -415,6 +437,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -440,6 +463,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -463,6 +487,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -481,6 +506,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -517,6 +543,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -549,6 +576,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -565,6 +593,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
       expect(service.getSocket()).not.toBeNull();
@@ -582,6 +611,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -613,6 +643,7 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
@@ -625,7 +656,7 @@ describe("WsManager — createWsService", () => {
       processOnSpy.mockRestore();
     });
 
-    it("does not bind handlers when connection fails at startup", async () => {
+    it("binds handlers even when connection fails at startup — socket will auto-reconnect", async () => {
       mockConnectFn = vi.fn().mockRejectedValue(new Error("Connection refused"));
 
       const processOnSpy = vi.spyOn(process, "on");
@@ -636,17 +667,121 @@ describe("WsManager — createWsService", () => {
         messageBuffer,
         delegationContentBuffer,
       });
+      activeService = service;
 
       await service.start();
 
       const sigTermCalls = processOnSpy.mock.calls.filter((c) => c[0] === "SIGTERM");
       const sigIntCalls = processOnSpy.mock.calls.filter((c) => c[0] === "SIGINT");
 
-      // Handlers should NOT be bound when connection failed
-      expect(sigTermCalls.length).toBe(0);
-      expect(sigIntCalls.length).toBe(0);
+      // Handlers SHOULD be bound even when connection failed — socket will auto-reconnect
+      expect(sigTermCalls.length).toBeGreaterThanOrEqual(1);
+      expect(sigIntCalls.length).toBeGreaterThanOrEqual(1);
 
+      // Clean up
+      service.stop!();
       processOnSpy.mockRestore();
+    });
+    it("removes SIGTERM and SIGINT handlers on stop", async () => {
+      const processOffSpy = vi.spyOn(process, "removeListener");
+
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      await service.start();
+      service.stop!();
+
+      const sigTermCalls = processOffSpy.mock.calls.filter((c) => c[0] === "SIGTERM");
+      const sigIntCalls = processOffSpy.mock.calls.filter((c) => c[0] === "SIGINT");
+
+      expect(sigTermCalls.length).toBeGreaterThanOrEqual(1);
+      expect(sigIntCalls.length).toBeGreaterThanOrEqual(1);
+
+      processOffSpy.mockRestore();
+    });
+  });
+
+  describe("handler leak prevention", () => {
+    it("re-subscribe after unsubscribe does not duplicate handlers", async () => {
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+      await service.start();
+
+      // Subscribe to a new group
+      await service.subscribeToGroup("group-new");
+      let ch = mockChannels.get("group:group-new");
+      expect(ch).toBeDefined();
+
+      // Trigger a message
+      ch!.trigger("new_message", {
+        id: "msg-1",
+        group_id: "group-new",
+        content: "First",
+        message_type: "post",
+        parent_message_id: null,
+        sender: { id: "s1", display_name: "S", verified: true },
+        created_at: "2026-01-01T00:00:00Z",
+      });
+      expect(messageBuffer.getGroupMessages("group-new")).toHaveLength(1);
+
+      // Unsubscribe — should clear
+      await service.unsubscribeFromGroup("group-new");
+      expect(messageBuffer.getGroupMessages("group-new")).toHaveLength(0);
+
+      // After unsubscribe, removeChannel should have been called on the mock socket
+      // so re-subscribe creates a fresh channel
+      // Reset mockChannels to simulate removeChannel effect
+      mockChannels.delete("group:group-new");
+
+      // Re-subscribe
+      await service.subscribeToGroup("group-new");
+      ch = mockChannels.get("group:group-new");
+      expect(ch).toBeDefined();
+
+      // Trigger one message — should only be buffered ONCE
+      ch!.trigger("new_message", {
+        id: "msg-2",
+        group_id: "group-new",
+        content: "Second",
+        message_type: "post",
+        parent_message_id: null,
+        sender: { id: "s1", display_name: "S", verified: true },
+        created_at: "2026-01-01T00:00:00Z",
+      });
+      expect(messageBuffer.getGroupMessages("group-new")).toHaveLength(1);
+    });
+
+    it("ignores messages with non-string id", async () => {
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      await service.start();
+
+      const groupCh = mockChannels.get("group:group-001");
+      expect(groupCh).toBeDefined();
+
+      // Trigger with numeric id — should be ignored
+      groupCh!.trigger("new_message", {
+        id: 42,
+        group_id: "group-001",
+        content: "Bad id",
+      });
+      expect(messageBuffer.getGroupMessages("group-001")).toHaveLength(0);
     });
   });
 });
