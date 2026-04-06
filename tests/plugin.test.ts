@@ -49,5 +49,18 @@ describe("plugin", () => {
       });
       expect(() => definePluginEntry(api)).not.toThrow();
     });
+
+    it("registers the WS service via api.registerService", () => {
+      const api = createMockPluginAPI({
+        apiKey: "mshz_test123",
+        baseUrl: "https://meshimize.fly.dev",
+      });
+      definePluginEntry(api);
+
+      expect(api._registeredServices).toHaveLength(1);
+      expect(api._registeredServices[0].name).toBe("meshimize-ws");
+      expect(typeof api._registeredServices[0].start).toBe("function");
+      expect(typeof api._registeredServices[0].stop).toBe("function");
+    });
   });
 });

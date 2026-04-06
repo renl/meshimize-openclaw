@@ -39,9 +39,12 @@
     "type": "git",
     "url": "https://github.com/renl/meshimize-openclaw.git"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.0",
     "typescript": "^5.4.0",
     "vitest": "^3.0.0",
     "eslint": "^8.57.0",
