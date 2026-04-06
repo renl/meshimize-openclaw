@@ -36,6 +36,9 @@ export function loadConfig(rawConfig?: Record<string, unknown>): Config {
       "Meshimize plugin: API key not configured. Set apiKey in your plugin config or set the MESHIMIZE_API_KEY environment variable.",
     );
   }
+  if (!apiKey.startsWith("mshz_")) {
+    throw new ConfigValidationError('Meshimize plugin: API key must start with "mshz_".');
+  }
 
   // Read baseUrl: config object first, then env var fallback, then default.
   const configBaseUrl = asString(rawConfig?.baseUrl, "baseUrl");

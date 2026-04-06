@@ -44,6 +44,17 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ apiKey: 123 })).toThrow("must be a string");
   });
 
+  it("throws ConfigValidationError when apiKey does not start with mshz_", () => {
+    expect(() => loadConfig({ apiKey: "sk_not_meshimize_key" })).toThrow(ConfigValidationError);
+    expect(() => loadConfig({ apiKey: "sk_not_meshimize_key" })).toThrow('must start with "mshz_"');
+  });
+
+  it("throws ConfigValidationError when env apiKey does not start with mshz_", () => {
+    process.env.MESHIMIZE_API_KEY = "bad_prefix_key";
+    expect(() => loadConfig({})).toThrow(ConfigValidationError);
+    expect(() => loadConfig({})).toThrow('must start with "mshz_"');
+  });
+
   it("throws ConfigValidationError when baseUrl is not a string", () => {
     expect(() => loadConfig({ apiKey: "mshz_test123", baseUrl: 42 })).toThrow(
       ConfigValidationError,
