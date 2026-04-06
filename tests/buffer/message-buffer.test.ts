@@ -270,6 +270,81 @@ describe("MessageBuffer", () => {
     expect(posts[1].id).toBe("msg-3");
   });
 
+  it("parentMessageId filtering returns only messages matching parent", () => {
+    const buffer = new MessageBuffer(100);
+
+    // A question
+    buffer.addGroupMessage("group-a", makeGroupMessage({ id: "q1", message_type: "question" }));
+    // An answer to q1
+    buffer.addGroupMessage(
+      "group-a",
+      makeGroupMessage({ id: "a1", message_type: "answer", parent_message_id: "q1" }),
+    );
+    // A second answer to q1
+    buffer.addGroupMessage(
+      "group-a",
+      makeGroupMessage({ id: "a2", message_type: "answer", parent_message_id: "q1" }),
+    );
+    // An answer to a different question
+    buffer.addGroupMessage(
+      "group-a",
+      makeGroupMessage({ id: "a3", message_type: "answer", parent_message_id: "q-other" }),
+    );
+    // A post (no parent)
+    buffer.addGroupMessage("group-a", makeGroupMessage({ id: "p1", message_type: "post" }));
+
+    // Filter for answers to q1
+    const answersToQ1 = buffer.getGroupMessages("group-a", { parentMessageId: "q1" });
+    expect(answersToQ1).toHaveLength(2);
+    expect(answersToQ1[0].id).toBe("a1");
+    expect(answersToQ1[1].id).toBe("a2");
+
+    // Filter for answers to q-other
+    const answersToOther = buffer.getGroupMessages("group-a", { parentMessageId: "q-other" });
+    expect(answersToOther).toHaveLength(1);
+    expect(answersToOther[0].id).toBe("a3");
+
+    // Filter for nonexistent parent returns empty
+    const noMatches = buffer.getGroupMessages("group-a", { parentMessageId: "nonexistent" });
+    expect(noMatches).toEqual([]);
+  });
+
+  it("parentMessageId combined with messageType filter", () => {
+    const buffer = new MessageBuffer(100);
+
+    buffer.addGroupMessage("group-a", makeGroupMessage({ id: "q1", message_type: "question" }));
+    buffer.addGroupMessage(
+      "group-a",
+      makeGroupMessage({ id: "a1", message_type: "answer", parent_message_id: "q1" }),
+    );
+    buffer.addGroupMessage(
+      "group-a",
+      makeGroupMessage({ id: "a2", message_type: "answer", parent_message_id: "q1" }),
+    );
+    // Post that happens to reference q1 as parent (unusual but valid)
+    buffer.addGroupMessage(
+      "group-a",
+      makeGroupMessage({ id: "p1", message_type: "post", parent_message_id: "q1" }),
+    );
+
+    // Filter: answers with parent q1
+    const answers = buffer.getGroupMessages("group-a", {
+      messageType: "answer",
+      parentMessageId: "q1",
+    });
+    expect(answers).toHaveLength(2);
+    expect(answers[0].id).toBe("a1");
+    expect(answers[1].id).toBe("a2");
+
+    // Filter: posts with parent q1
+    const posts = buffer.getGroupMessages("group-a", {
+      messageType: "post",
+      parentMessageId: "q1",
+    });
+    expect(posts).toHaveLength(1);
+    expect(posts[0].id).toBe("p1");
+  });
+
   it("unanswered filtering finds questions without corresponding answers", () => {
     const buffer = new MessageBuffer(100);
 
