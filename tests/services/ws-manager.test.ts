@@ -605,6 +605,50 @@ describe("WsManager — createWsService", () => {
 
       expect(mockChannels.has("group:group-003")).toBe(false);
     });
+
+    it("re-subscribes to a group channel that became stale (closed/errored)", async () => {
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      await service.start();
+
+      // group-001 was subscribed during start and is "joined"
+      const ch = mockChannels.get("group:group-001");
+      expect(ch).toBeDefined();
+      expect(ch!.getState()).toBe("joined");
+
+      // Simulate the channel transitioning to errored state (server-side lifecycle event)
+      ch!.resetState(); // Sets joinCalled = false, mock getState returns "closed"
+
+      // Now subscribeToGroup should detect the stale channel and re-subscribe
+      // Delete from mockChannels to simulate removeChannel creating a fresh channel
+      mockChannels.delete("group:group-001");
+
+      await service.subscribeToGroup("group-001");
+
+      // A fresh channel should have been created and joined
+      const newCh = mockChannels.get("group:group-001");
+      expect(newCh).toBeDefined();
+      expect(newCh!.joinCalled).toBe(true);
+
+      // Verify message routing still works on the new channel
+      newCh!.trigger("new_message", {
+        id: "msg-after-stale",
+        group_id: "group-001",
+        content: "Post-recovery message",
+        message_type: "post",
+        parent_message_id: null,
+        sender: { id: "s1", display_name: "S", verified: true },
+        created_at: "2026-01-01T00:00:00Z",
+      });
+      const msgs = messageBuffer.getGroupMessages("group-001");
+      expect(msgs.some((m: { id: string }) => m.id === "msg-after-stale")).toBe(true);
+    });
   });
 
   describe("unsubscribeFromGroup", () => {
@@ -875,6 +919,41 @@ describe("WsManager — createWsService", () => {
         content: "Bad id",
       });
       expect(messageBuffer.getGroupMessages("group-001")).toHaveLength(0);
+    });
+
+    it("account channel handlers do not accumulate on reconnect", async () => {
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      await service.start();
+
+      // Get the account channel after initial subscribe
+      const acctCh = mockChannels.get("account:acct-001");
+      expect(acctCh).toBeDefined();
+
+      // Count initial handlers for new_direct_message
+      const initialDmHandlers = acctCh!.handlers.get("new_direct_message")?.length ?? 0;
+      expect(initialDmHandlers).toBe(1);
+
+      // Simulate reconnect — onStateChange fires "connected" again, which calls subscribeInitialChannels
+      // First, we need to delete the old channel from mockChannels so a fresh one is created
+      // (simulating removeChannel effect)
+      mockChannels.delete("account:acct-001");
+
+      mockOnStateChange!("connected");
+      await new Promise((r) => setTimeout(r, 0));
+
+      // A new account channel should have been created with exactly 1 handler per event
+      const newAcctCh = mockChannels.get("account:acct-001");
+      expect(newAcctCh).toBeDefined();
+      expect(newAcctCh!.handlers.get("new_direct_message")?.length ?? 0).toBe(1);
+      expect(newAcctCh!.handlers.get("delegation_created")?.length ?? 0).toBe(1);
+      expect(newAcctCh!.handlers.get("delegation_updated")?.length ?? 0).toBe(1);
     });
   });
 });

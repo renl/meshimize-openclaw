@@ -43,6 +43,10 @@ export function createWsService(deps: WsManagerDeps): WsService {
   const groupMessageHandlers: Map<string, (payload: unknown) => void> = new Map();
   // Retained for future tool slice use (Slice 4+: DM tools may need to access it)
   let _accountChannel: Channel | null = null;
+  // Account channel handler references — stored for cleanup on reconnect (Issue A)
+  let accountDmHandler: ((payload: unknown) => void) | null = null;
+  let accountDelegationCreatedHandler: ((payload: unknown) => void) | null = null;
+  let accountDelegationUpdatedHandler: ((payload: unknown) => void) | null = null;
   let shutdownHandlersBound = false;
   let sigTermHandler: (() => void) | null = null;
   let sigIntHandler: (() => void) | null = null;
@@ -131,27 +135,50 @@ export function createWsService(deps: WsManagerDeps): WsService {
       const accountResponse = await api.getAccount();
       const accountId = accountResponse.data.id;
 
+      // Clean up any existing account channel before re-subscribing (Issue A: handler accumulation)
+      if (_accountChannel) {
+        if (accountDmHandler) {
+          _accountChannel.off("new_direct_message", accountDmHandler);
+          accountDmHandler = null;
+        }
+        if (accountDelegationCreatedHandler) {
+          _accountChannel.off("delegation_created", accountDelegationCreatedHandler);
+          accountDelegationCreatedHandler = null;
+        }
+        if (accountDelegationUpdatedHandler) {
+          _accountChannel.off("delegation_updated", accountDelegationUpdatedHandler);
+          accountDelegationUpdatedHandler = null;
+        }
+        await _accountChannel.leave();
+        socket.removeChannel(`account:${accountId}`);
+        _accountChannel = null;
+      }
+
       // Subscribe to account channel for DMs and delegation events
       const acctCh = socket.channel(`account:${accountId}`);
       try {
         await acctCh.join();
         _accountChannel = acctCh;
 
+        // Store handler references for cleanup on reconnect (Issue A)
         // Listen for direct messages (Fix 5: stronger runtime validation)
-        acctCh.on("new_direct_message", (payload: unknown) => {
+        accountDmHandler = (payload: unknown) => {
           const msg = payload as Record<string, unknown>;
           if (msg && typeof msg === "object" && typeof msg.id === "string") {
             messageBuffer.addDirectMessage(payload as DirectMessageDataResponse);
           }
-        });
+        };
+        acctCh.on("new_direct_message", accountDmHandler);
 
         // Listen for delegation events
-        acctCh.on("delegation_created", (payload: unknown) => {
+        accountDelegationCreatedHandler = (payload: unknown) => {
           handleDelegationEvent(payload);
-        });
-        acctCh.on("delegation_updated", (payload: unknown) => {
+        };
+        acctCh.on("delegation_created", accountDelegationCreatedHandler);
+        accountDelegationUpdatedHandler = (payload: unknown) => {
           handleDelegationEvent(payload);
-        });
+        };
+        acctCh.on("delegation_updated", accountDelegationUpdatedHandler);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[meshimize-ws] Failed to join account channel: ${msg}`);
@@ -172,7 +199,21 @@ export function createWsService(deps: WsManagerDeps): WsService {
 
   async function subscribeToGroup(groupId: string): Promise<void> {
     if (!socket || socket.getState() !== "connected") return;
-    if (groupChannels.has(groupId)) return;
+
+    // Issue B: Check existing channel state — only skip if genuinely joined
+    const existingCh = groupChannels.get(groupId);
+    if (existingCh) {
+      if (existingCh.getState() === "joined") return;
+
+      // Channel exists but is stale (closed/errored/leaving) — clean up before re-subscribing
+      const handler = groupMessageHandlers.get(groupId);
+      if (handler) {
+        existingCh.off("new_message", handler);
+        groupMessageHandlers.delete(groupId);
+      }
+      groupChannels.delete(groupId);
+      socket.removeChannel(`group:${groupId}`);
+    }
 
     const ch = socket.channel(`group:${groupId}`);
     try {
@@ -250,6 +291,9 @@ export function createWsService(deps: WsManagerDeps): WsService {
     groupChannels.clear();
     groupMessageHandlers.clear();
     _accountChannel = null;
+    accountDmHandler = null;
+    accountDelegationCreatedHandler = null;
+    accountDelegationUpdatedHandler = null;
   }
 
   return {
