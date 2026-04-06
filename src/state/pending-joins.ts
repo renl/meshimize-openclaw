@@ -105,8 +105,9 @@ class PendingJoinMapImpl implements PendingJoinMap {
       expires_at: new Date(now + this.joinTimeoutMs).toISOString(),
     };
 
-    this.map.set(group.id, request);
-    return request;
+    const frozen = Object.freeze(request);
+    this.map.set(group.id, frozen);
+    return frozen;
   }
 
   getByGroupId(groupId: string): PendingJoinRequest | undefined {
@@ -125,6 +126,7 @@ class PendingJoinMapImpl implements PendingJoinMap {
   }
 
   remove(groupId: string): void {
+    this.pruneExpired();
     const existing = this.map.get(groupId);
     if (existing) {
       this.map.delete(groupId);

@@ -260,6 +260,46 @@ describe("PendingJoinMap", () => {
 
       expect(onRemoved).toHaveBeenCalledWith(request);
     });
+
+    it("prunes expired entries before removing — fires onExpired not onRemoved for dead entries", () => {
+      vi.useFakeTimers();
+      const onExpired = vi.fn();
+      const onRemoved = vi.fn();
+      map = createPendingJoinMap(makeConfig({ joinTimeoutMs: 1000 }), { onExpired, onRemoved });
+      map.add(makeGroup("g-dead"));
+
+      vi.advanceTimersByTime(1001);
+
+      // remove() should prune the expired entry first; onExpired fires, not onRemoved
+      map.remove("g-dead");
+      expect(onExpired).toHaveBeenCalledTimes(1);
+      expect(onRemoved).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe("immutability of returned requests", () => {
+    it("returned PendingJoinRequest objects are frozen", () => {
+      map = createPendingJoinMap(makeConfig());
+      const request = map.add(makeGroup("g-freeze"));
+
+      expect(Object.isFrozen(request)).toBe(true);
+
+      // Mutation should throw in strict mode (vitest runs in strict)
+      expect(() => {
+        (request as Record<string, unknown>).expires_at = "2099-01-01T00:00:00.000Z";
+      }).toThrow();
+    });
+
+    it("retrieved request is the same frozen instance", () => {
+      map = createPendingJoinMap(makeConfig());
+      const added = map.add(makeGroup("g-same"));
+      const retrieved = map.getByGroupId("g-same");
+
+      expect(retrieved).toBe(added);
+      expect(Object.isFrozen(retrieved)).toBe(true);
+    });
   });
 
   describe("listPending() filters out expired", () => {
