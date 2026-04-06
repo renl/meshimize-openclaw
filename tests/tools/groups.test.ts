@@ -575,7 +575,7 @@ describe("registerGroupTools", () => {
 });
 
 describe("plugin registration integration", () => {
-  it("registers 1 service + 7 tools after definePluginEntry", () => {
+  it("registers 1 service + 21 tools after definePluginEntry", () => {
     const api = createMockPluginAPI({
       apiKey: "mshz_test123",
       baseUrl: "https://meshimize.fly.dev",
@@ -584,10 +584,10 @@ describe("plugin registration integration", () => {
 
     expect(api._registeredServices).toHaveLength(1);
     expect(api._registeredServices[0].name).toBe("meshimize-ws");
-    expect(api._registeredTools).toHaveLength(7);
+    expect(api._registeredTools).toHaveLength(21);
   });
 
-  it("all 7 tools have meshimize_ prefix", () => {
+  it("all 21 tools have meshimize_ prefix", () => {
     const api = createMockPluginAPI({
       apiKey: "mshz_test123",
       baseUrl: "https://meshimize.fly.dev",
