@@ -28,8 +28,8 @@ export class ConfigValidationError extends Error {
 export function loadConfig(rawConfig?: Record<string, unknown>): Config {
   // Read apiKey: config object first, then env var fallback.
   // asString() distinguishes "not present" (undefined) from "present but empty" ("").
-  // Only fall back to env var when the config property is truly absent.
-  const configApiKey = asString(rawConfig?.apiKey);
+  // Throws if value is present but wrong type. Only falls back to env var when truly absent.
+  const configApiKey = asString(rawConfig?.apiKey, "apiKey");
   const apiKey = configApiKey ?? process.env.MESHIMIZE_API_KEY ?? "";
   if (!apiKey) {
     throw new ConfigValidationError(
@@ -38,12 +38,12 @@ export function loadConfig(rawConfig?: Record<string, unknown>): Config {
   }
 
   // Read baseUrl: config object first, then env var fallback, then default.
-  const configBaseUrl = asString(rawConfig?.baseUrl);
+  const configBaseUrl = asString(rawConfig?.baseUrl, "baseUrl");
   const rawBaseUrl = configBaseUrl ?? process.env.MESHIMIZE_BASE_URL ?? "https://api.meshimize.com";
   const baseUrl = validateBaseUrl(rawBaseUrl);
 
   // Read wsUrl: config object first, then env var fallback, then derive from baseUrl.
-  const configWsUrl = asString(rawConfig?.wsUrl);
+  const configWsUrl = asString(rawConfig?.wsUrl, "wsUrl");
   const rawWsUrl = configWsUrl ?? process.env.MESHIMIZE_WS_URL;
   const wsUrl = rawWsUrl ? validateWsUrl(rawWsUrl) : deriveWsUrl(baseUrl);
 
@@ -52,13 +52,16 @@ export function loadConfig(rawConfig?: Record<string, unknown>): Config {
 
 /**
  * Safely extract a string from an unknown value.
- * Returns undefined only when the property is absent (undefined/null) or not a string.
+ * Returns undefined only when the property is absent (undefined/null).
  * Returns "" for explicitly configured empty strings so callers can detect misconfiguration.
+ * Throws ConfigValidationError when value is present but not a string (e.g. number, boolean).
  */
-function asString(value: unknown): string | undefined {
+function asString(value: unknown, fieldName?: string): string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value === "string") return value;
-  return undefined;
+  throw new ConfigValidationError(
+    `Meshimize plugin: ${fieldName ?? "config field"} must be a string, got ${typeof value}.`,
+  );
 }
 
 /** Validate baseUrl is an origin-only HTTP(S) URL. */

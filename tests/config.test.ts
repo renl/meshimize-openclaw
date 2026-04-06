@@ -41,6 +41,21 @@ describe("loadConfig", () => {
 
   it("throws ConfigValidationError when apiKey is not a string", () => {
     expect(() => loadConfig({ apiKey: 123 })).toThrow(ConfigValidationError);
+    expect(() => loadConfig({ apiKey: 123 })).toThrow("must be a string");
+  });
+
+  it("throws ConfigValidationError when baseUrl is not a string", () => {
+    expect(() => loadConfig({ apiKey: "mshz_test123", baseUrl: 42 })).toThrow(
+      ConfigValidationError,
+    );
+    expect(() => loadConfig({ apiKey: "mshz_test123", baseUrl: 42 })).toThrow("must be a string");
+  });
+
+  it("throws ConfigValidationError when wsUrl is not a string", () => {
+    expect(() => loadConfig({ apiKey: "mshz_test123", wsUrl: true })).toThrow(
+      ConfigValidationError,
+    );
+    expect(() => loadConfig({ apiKey: "mshz_test123", wsUrl: true })).toThrow("must be a string");
   });
 
   it("uses custom baseUrl when provided", () => {

@@ -80,11 +80,28 @@ export class MeshimizeAPI {
         headers["Content-Type"] = "application/json";
       }
 
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}${path}`, {
+          method,
+          headers,
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+        });
+      } catch (error: unknown) {
+        // Network/transport failure (DNS, connection reset, timeout).
+        // Retry with backoff if attempts remain; otherwise re-throw.
+        if (attempt < maxAttempts - 1) {
+          const baseDelay = 1000;
+          const maxDelay = 30000;
+          const delayMs = Math.min(
+            baseDelay * Math.pow(2, attempt) + Math.random() * 1000,
+            maxDelay,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+        throw error;
+      }
 
       if (response.ok) {
         if (response.status === 204) return undefined as T;

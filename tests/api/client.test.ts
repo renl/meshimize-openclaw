@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MeshimizeAPI, MeshimizeAPIError } from "../../src/api/client.js";
 
 describe("MeshimizeAPIError", () => {
@@ -71,5 +71,53 @@ describe("MeshimizeAPI", () => {
     expect(typeof client.cancelDelegation).toBe("function");
     expect(typeof client.acknowledgeDelegation).toBe("function");
     expect(typeof client.extendDelegation).toBe("function");
+  });
+
+  it("retries on network failure and succeeds on subsequent attempt", async () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+
+    let callCount = 0;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new TypeError("fetch failed");
+      }
+      return new Response(JSON.stringify({ data: { id: "acc_123" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const result = await client.getAccount();
+      expect(result).toEqual({ data: { id: "acc_123" } });
+      expect(callCount).toBe(2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("throws network error after all retries exhausted", async () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch;
+
+    try {
+      await expect(client.getAccount()).rejects.toThrow("fetch failed");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
