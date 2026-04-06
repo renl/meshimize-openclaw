@@ -69,22 +69,23 @@ export function createWsService(deps: WsManagerDeps): WsService {
       },
     });
 
-    // Wire onStateChange to subscribe initial channels on reconnect only.
-    // The initial successful connect subscribes synchronously below; onStateChange
-    // handles later reconnects. hasConnectedOnce prevents double-subscription on
-    // the first connect (PR review R2).
-    let hasConnectedOnce = false;
+    // Track whether the initial channel subscription path has been triggered.
+    // Prevents duplicate subscribeInitialChannels() on the first connect:
+    // onStateChange fires synchronously during connect(), before connect()'s
+    // promise resolves and before the post-connect subscribeInitialChannels() call.
+    // On initial failure, the catch block sets this flag so that onStateChange
+    // can subscribe on the first successful reconnect.
+    let subscriptionTriggered = false;
 
     socket.onStateChange = (state) => {
       if (state !== "connected") return;
 
-      // Skip the first connection — handled by the post-connect block below
-      if (!hasConnectedOnce) {
-        hasConnectedOnce = true;
-        return;
-      }
+      // Skip the first successful connection — handled by the post-connect block below.
+      // subscriptionTriggered is false until either: (a) post-connect sets it after
+      // await subscribeInitialChannels(), or (b) the catch block sets it on initial failure.
+      if (!subscriptionTriggered) return;
 
-      // Fire and forget — errors are logged inside subscribeInitialChannels
+      // This is a reconnect (or first connect after initial failure) — subscribe async
       subscribeInitialChannels().catch((err) => {
         const errMsg = err instanceof Error ? err.message : String(err);
         console.error(
@@ -111,12 +112,14 @@ export function createWsService(deps: WsManagerDeps): WsService {
     } catch (err) {
       // Connection failure at startup is non-fatal — the PhoenixSocket will reconnect.
       // Log the error but don't throw — the plugin should still register tools.
-      // onStateChange will handle subscription when reconnect succeeds.
+      // Enable onStateChange to subscribe when reconnect succeeds.
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[meshimize-ws] Initial connection failed: ${msg}`);
+      subscriptionTriggered = true;
       return;
     }
 
+    subscriptionTriggered = true;
     await subscribeInitialChannels();
   }
 
@@ -179,7 +182,13 @@ export function createWsService(deps: WsManagerDeps): WsService {
       // Store handler reference for cleanup (Fix 4 + Fix 6: stronger runtime validation)
       const messageHandler = (payload: unknown) => {
         const msg = payload as Record<string, unknown>;
-        if (msg && typeof msg === "object" && typeof msg.id === "string") {
+        if (
+          msg &&
+          typeof msg === "object" &&
+          typeof msg.id === "string" &&
+          "group_id" in msg &&
+          msg.group_id === groupId
+        ) {
           messageBuffer.addGroupMessage(groupId, payload as MessageDataResponse);
         }
       };

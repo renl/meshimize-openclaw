@@ -24,6 +24,7 @@ let mockChannels: Map<string, MockChannel>;
 let mockSocketConnected: boolean;
 let mockConnectFn: ReturnType<typeof vi.fn>;
 let mockDisconnectFn: ReturnType<typeof vi.fn>;
+let mockOnStateChange: ((state: string) => void) | undefined;
 
 function createMockChannel(topic: string): MockChannel {
   const handlers = new Map<string, Array<(payload: unknown) => void>>();
@@ -72,32 +73,45 @@ function createMockChannel(topic: string): MockChannel {
 
 vi.mock("../../src/ws/client.js", () => {
   return {
-    PhoenixSocket: vi.fn().mockImplementation(() => ({
-      connect: vi.fn().mockImplementation(async () => {
-        if (mockConnectFn) return mockConnectFn();
-        mockSocketConnected = true;
-      }),
-      disconnect: vi.fn().mockImplementation(() => {
-        if (mockDisconnectFn) mockDisconnectFn();
-        mockSocketConnected = false;
-      }),
-      getState: vi
-        .fn()
-        .mockImplementation(() => (mockSocketConnected ? "connected" : "disconnected")),
-      channel: vi.fn().mockImplementation((topic: string) => {
-        let ch = mockChannels.get(topic);
-        if (!ch) {
-          ch = createMockChannel(topic);
-          mockChannels.set(topic, ch);
-        }
-        return ch;
-      }),
-      removeChannel: vi.fn().mockImplementation((_topic: string) => {
-        // Simulate removing channel from socket's internal map
-        // (actual mockChannels deletion is handled in test assertions)
-      }),
-      makeRef: vi.fn().mockReturnValue("1"),
-    })),
+    PhoenixSocket: vi.fn().mockImplementation(() => {
+      let _onStateChange: ((state: string) => void) | undefined;
+      const instance = {
+        connect: vi.fn().mockImplementation(async () => {
+          if (mockConnectFn) return mockConnectFn();
+          mockSocketConnected = true;
+        }),
+        disconnect: vi.fn().mockImplementation(() => {
+          if (mockDisconnectFn) mockDisconnectFn();
+          mockSocketConnected = false;
+        }),
+        getState: vi
+          .fn()
+          .mockImplementation(() => (mockSocketConnected ? "connected" : "disconnected")),
+        channel: vi.fn().mockImplementation((topic: string) => {
+          let ch = mockChannels.get(topic);
+          if (!ch) {
+            ch = createMockChannel(topic);
+            mockChannels.set(topic, ch);
+          }
+          return ch;
+        }),
+        removeChannel: vi.fn().mockImplementation((_topic: string) => {
+          // Simulate removing channel from socket's internal map
+          // (actual mockChannels deletion is handled in test assertions)
+        }),
+        makeRef: vi.fn().mockReturnValue("1"),
+      };
+      Object.defineProperty(instance, "onStateChange", {
+        get: () => _onStateChange,
+        set: (fn: ((state: string) => void) | undefined) => {
+          _onStateChange = fn;
+          mockOnStateChange = fn;
+        },
+        enumerable: true,
+        configurable: true,
+      });
+      return instance;
+    }),
   };
 });
 
@@ -166,6 +180,7 @@ describe("WsManager — createWsService", () => {
   beforeEach(() => {
     mockChannels = new Map();
     mockSocketConnected = false;
+    mockOnStateChange = undefined;
     mockConnectFn = vi.fn().mockImplementation(async () => {
       mockSocketConnected = true;
     });
@@ -302,6 +317,35 @@ describe("WsManager — createWsService", () => {
       expect(mockApi.getAccount).not.toHaveBeenCalled();
     });
 
+    it("subscribes to channels on reconnect after initial connection failure", async () => {
+      mockConnectFn = vi.fn().mockRejectedValueOnce(new Error("Connection refused"));
+
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      await service.start();
+
+      // Initial connect failed — API should not have been called
+      expect(mockApi.getAccount).not.toHaveBeenCalled();
+
+      // Simulate reconnect success: PhoenixSocket reconnects and fires onStateChange("connected")
+      mockSocketConnected = true;
+      expect(mockOnStateChange).toBeDefined();
+      mockOnStateChange!("connected");
+
+      // Allow async subscribeInitialChannels to settle
+      await new Promise((r) => setTimeout(r, 0));
+
+      // API should now have been called — channels subscribed on reconnect
+      expect(mockApi.getAccount).toHaveBeenCalled();
+      expect(mockApi.getMyGroups).toHaveBeenCalled();
+    });
+
     it("handles getAccount failure gracefully — does not throw", async () => {
       (mockApi.getAccount as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("API error"));
 
@@ -401,6 +445,34 @@ describe("WsManager — createWsService", () => {
 
       const messages = messageBuffer.getGroupMessages("group-001");
       expect(messages).toHaveLength(0);
+    });
+
+    it("ignores group messages with mismatched group_id", async () => {
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      await service.start();
+
+      const groupCh = mockChannels.get("group:group-001");
+      expect(groupCh).toBeDefined();
+
+      // Trigger with wrong group_id — should be rejected
+      groupCh!.trigger("new_message", {
+        id: "msg-misroute",
+        group_id: "group-999",
+        content: "Wrong group",
+        message_type: "post",
+        parent_message_id: null,
+        sender: { id: "s1", display_name: "S", verified: true },
+        created_at: "2026-01-01T00:00:00Z",
+      });
+
+      expect(messageBuffer.getGroupMessages("group-001")).toHaveLength(0);
     });
   });
 
