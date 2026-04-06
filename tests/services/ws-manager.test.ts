@@ -633,6 +633,27 @@ describe("WsManager — createWsService", () => {
     });
   });
 
+  describe("double-start guard", () => {
+    it("calling start() twice stops the first socket before creating a new one", async () => {
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      await service.start();
+      expect(mockConnectFn).toHaveBeenCalledTimes(1);
+      expect(mockDisconnectFn).not.toHaveBeenCalled();
+
+      // Second start — should disconnect the first socket, then connect a new one
+      await service.start();
+      expect(mockDisconnectFn).toHaveBeenCalledTimes(1);
+      expect(mockConnectFn).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("process exit handlers", () => {
     it("binds SIGTERM and SIGINT handlers on start", async () => {
       const processOnSpy = vi.spyOn(process, "on");

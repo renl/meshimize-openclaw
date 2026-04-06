@@ -581,4 +581,50 @@ describe("PhoenixSocket", () => {
     await vi.advanceTimersByTimeAsync(10000);
     expect(connectCount).toBe(2);
   });
+
+  it("disconnect skips phx_leave when socket is already closed (no noisy warn logs)", async () => {
+    const logMessages: Array<{ level: string; msg: string }> = [];
+
+    const socket = new PhoenixSocket("wss://example.com/ws?token=key&vsn=2.0.0", {
+      heartbeatIntervalMs: 60000,
+      reconnectIntervalMs: 5000,
+      maxReconnectAttempts: 0, // prevent auto-reconnect
+      logger: (level, msg) => {
+        logMessages.push({ level, msg });
+      },
+    });
+
+    const connectPromise = socket.connect();
+    mockWS._emit("open");
+    await connectPromise;
+
+    // Join a channel
+    const ch = socket.channel("group:abc123");
+    const joinPromise = ch.join();
+
+    const joinReply: PhoenixMessage = [
+      "1",
+      "2",
+      "group:abc123",
+      "phx_reply",
+      { status: "ok", response: {} } as PhoenixReplyPayload,
+    ];
+    mockWS._emit("message", JSON.stringify(joinReply));
+    await joinPromise;
+
+    expect(ch.getState()).toBe("joined");
+
+    // Simulate unexpected close — ws goes away
+    mockWS.readyState = 3; // WebSocket.CLOSED
+
+    // Clear any log messages from the connection lifecycle
+    logMessages.length = 0;
+
+    // Now call disconnect — should NOT produce warn logs about "not open"
+    socket.disconnect();
+
+    const warnLogs = logMessages.filter((l) => l.level === "warn");
+    const sendWarns = warnLogs.filter((l) => l.msg.includes("not open"));
+    expect(sendWarns).toHaveLength(0);
+  });
 });

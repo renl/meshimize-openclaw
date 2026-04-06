@@ -143,22 +143,28 @@ export class PhoenixSocket implements SocketAdapter {
       this.reconnectTimer = null;
     }
 
-    // Send phx_leave for all joined channels
-    for (const channel of this.channels.values()) {
-      if (channel.getState() === "joined") {
-        const ref = this.makeRef();
-        const message: PhoenixMessage = [
-          channel.getJoinRef(),
-          ref,
-          channel.getTopic(),
-          "phx_leave",
-          {},
-        ];
-        this.send(message);
+    // Send phx_leave for all joined channels only while the socket is still open.
+    // Skip when ws is null/closed to avoid noisy warn logs during shutdown after
+    // an unexpected disconnect (PR review R2).
+    const canSendLeave = this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+
+    if (canSendLeave) {
+      for (const channel of this.channels.values()) {
+        if (channel.getState() === "joined") {
+          const ref = this.makeRef();
+          const message: PhoenixMessage = [
+            channel.getJoinRef(),
+            ref,
+            channel.getTopic(),
+            "phx_leave",
+            {},
+          ];
+          this.send(message);
+        }
       }
     }
 
-    // Reset all channel states without sending (fire-and-forget leave already sent above)
+    // Reset all channel states regardless of whether a leave frame could be sent.
     for (const channel of this.channels.values()) {
       channel.resetState();
     }

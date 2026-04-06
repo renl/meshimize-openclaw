@@ -48,6 +48,11 @@ export function createWsService(deps: WsManagerDeps): WsService {
   let sigIntHandler: (() => void) | null = null;
 
   async function start(): Promise<void> {
+    // Guard against double-start: stop existing socket before creating a new one (PR review R2)
+    if (socket) {
+      stop();
+    }
+
     // Build the WS URL with token and vsn params per architecture §6.4
     const wsUrl = new URL(config.wsUrl);
     wsUrl.searchParams.set("token", config.apiKey);
@@ -64,20 +69,28 @@ export function createWsService(deps: WsManagerDeps): WsService {
       },
     });
 
-    // Wire onStateChange to subscribe initial channels on reconnect (Fix 2)
-    let initialChannelsSubscribed = false;
+    // Wire onStateChange to subscribe initial channels on reconnect only.
+    // The initial successful connect subscribes synchronously below; onStateChange
+    // handles later reconnects. hasConnectedOnce prevents double-subscription on
+    // the first connect (PR review R2).
+    let hasConnectedOnce = false;
 
     socket.onStateChange = (state) => {
-      if (state === "connected" && !initialChannelsSubscribed) {
-        initialChannelsSubscribed = true;
-        // Fire and forget — errors are logged inside subscribeInitialChannels
-        subscribeInitialChannels().catch((err) => {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          console.error(
-            `[meshimize-ws] Failed to subscribe initial channels on reconnect: ${errMsg}`,
-          );
-        });
+      if (state !== "connected") return;
+
+      // Skip the first connection — handled by the post-connect block below
+      if (!hasConnectedOnce) {
+        hasConnectedOnce = true;
+        return;
       }
+
+      // Fire and forget — errors are logged inside subscribeInitialChannels
+      subscribeInitialChannels().catch((err) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[meshimize-ws] Failed to subscribe initial channels on reconnect: ${errMsg}`,
+        );
+      });
     };
 
     // Bind process exit handlers for cleanup (only once).
@@ -104,8 +117,6 @@ export function createWsService(deps: WsManagerDeps): WsService {
       return;
     }
 
-    // Mark as subscribed before calling — the onStateChange callback won't fire again
-    initialChannelsSubscribed = true;
     await subscribeInitialChannels();
   }
 
