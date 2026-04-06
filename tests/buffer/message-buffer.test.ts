@@ -170,6 +170,23 @@ describe("MessageBuffer", () => {
     expect(result[0].id).toBe("msg-3");
   });
 
+  it("capacity of 0 — drops all messages without creating per-group state", () => {
+    const buffer = new MessageBuffer(0);
+
+    buffer.addGroupMessage("group-a", makeGroupMessage({ id: "msg-1" }));
+    buffer.addGroupMessage("group-b", makeGroupMessage({ id: "msg-2" }));
+    buffer.addGroupMessage("group-c", makeGroupMessage({ id: "msg-3" }));
+    buffer.addDirectMessage(makeDirectMessage({ id: "dm-1" }));
+    buffer.addDirectMessage(makeDirectMessage({ id: "dm-2" }));
+
+    expect(buffer.getGroupMessages("group-a")).toHaveLength(0);
+    expect(buffer.getGroupMessages("group-b")).toHaveLength(0);
+    expect(buffer.getGroupMessages("group-c")).toHaveLength(0);
+    expect(buffer.getDirectMessages()).toHaveLength(0);
+    expect(buffer.getLastMessageId("group-a")).toBeUndefined();
+    expect(buffer.getLastDirectMessageId()).toBeUndefined();
+  });
+
   it("large capacity (10000) — no eviction below limit", () => {
     const buffer = new MessageBuffer(10000);
 

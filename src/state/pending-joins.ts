@@ -53,6 +53,24 @@ class PendingJoinMapImpl implements PendingJoinMap {
     config: PendingJoinConfig,
     private readonly callbacks?: PendingJoinMapCallbacks,
   ) {
+    if (
+      !Number.isFinite(config.joinTimeoutMs) ||
+      !Number.isInteger(config.joinTimeoutMs) ||
+      config.joinTimeoutMs <= 0
+    ) {
+      throw new RangeError(
+        `joinTimeoutMs must be a finite positive integer, got: ${config.joinTimeoutMs}`,
+      );
+    }
+    if (
+      !Number.isFinite(config.maxPendingJoins) ||
+      !Number.isInteger(config.maxPendingJoins) ||
+      config.maxPendingJoins <= 0
+    ) {
+      throw new RangeError(
+        `maxPendingJoins must be a finite positive integer, got: ${config.maxPendingJoins}`,
+      );
+    }
     this.joinTimeoutMs = config.joinTimeoutMs;
     this.maxPendingJoins = config.maxPendingJoins;
     this.pruneInterval = setInterval(() => this.pruneExpired(), 60_000);

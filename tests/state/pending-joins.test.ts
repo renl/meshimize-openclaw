@@ -33,6 +33,33 @@ describe("PendingJoinMap", () => {
     map?.dispose();
   });
 
+  describe("constructor validation", () => {
+    it("rejects non-positive joinTimeoutMs", () => {
+      expect(() => createPendingJoinMap(makeConfig({ joinTimeoutMs: 0 }))).toThrow(RangeError);
+      expect(() => createPendingJoinMap(makeConfig({ joinTimeoutMs: -1 }))).toThrow(RangeError);
+      expect(() => createPendingJoinMap(makeConfig({ joinTimeoutMs: NaN }))).toThrow(RangeError);
+      expect(() => createPendingJoinMap(makeConfig({ joinTimeoutMs: Infinity }))).toThrow(
+        RangeError,
+      );
+      expect(() => createPendingJoinMap(makeConfig({ joinTimeoutMs: 1.5 }))).toThrow(RangeError);
+    });
+
+    it("rejects non-positive maxPendingJoins", () => {
+      expect(() => createPendingJoinMap(makeConfig({ maxPendingJoins: 0 }))).toThrow(RangeError);
+      expect(() => createPendingJoinMap(makeConfig({ maxPendingJoins: -1 }))).toThrow(RangeError);
+      expect(() => createPendingJoinMap(makeConfig({ maxPendingJoins: NaN }))).toThrow(RangeError);
+      expect(() => createPendingJoinMap(makeConfig({ maxPendingJoins: Infinity }))).toThrow(
+        RangeError,
+      );
+      expect(() => createPendingJoinMap(makeConfig({ maxPendingJoins: 2.5 }))).toThrow(RangeError);
+    });
+
+    it("accepts valid config values", () => {
+      map = createPendingJoinMap(makeConfig({ joinTimeoutMs: 1, maxPendingJoins: 1 }));
+      expect(map.listPending()).toHaveLength(0);
+    });
+  });
+
   describe("add() + getByGroupId()", () => {
     it("stores and retrieves a pending request", () => {
       map = createPendingJoinMap(makeConfig());
@@ -146,13 +173,17 @@ describe("PendingJoinMap", () => {
     });
 
     it("expired entries cleaned by timer", () => {
-      map = createPendingJoinMap(makeConfig({ joinTimeoutMs: 1000 }));
+      const onExpired = vi.fn();
+      map = createPendingJoinMap(makeConfig({ joinTimeoutMs: 1000 }), { onExpired });
       map.add(makeGroup("g-interval"));
 
-      // Advance past expiry and past the 60s prune interval
+      expect(onExpired).not.toHaveBeenCalled();
+
+      // Advance past expiry and past the 60s prune interval.
+      // Do not call methods like listPending() here because they also prune lazily.
       vi.advanceTimersByTime(61000);
 
-      expect(map.listPending()).toHaveLength(0);
+      expect(onExpired).toHaveBeenCalledTimes(1);
     });
   });
 

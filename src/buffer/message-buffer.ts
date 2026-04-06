@@ -26,6 +26,7 @@ export class MessageBuffer {
 
   /** Appends a group message. Evicts oldest if over capacity. Auto-creates group buffer on first push. */
   addGroupMessage(groupId: string, message: MessageDataResponse): void {
+    if (this.maxPerChannel === 0) return;
     let buffer = this.groupMessages.get(groupId);
     if (!buffer) {
       buffer = [];
@@ -40,6 +41,7 @@ export class MessageBuffer {
 
   /** Appends a direct message. Evicts oldest if over capacity. */
   addDirectMessage(message: DirectMessageDataResponse): void {
+    if (this.maxPerChannel === 0) return;
     this.directMessages.push(message);
     const overflow = this.directMessages.length - this.maxPerChannel;
     if (overflow > 0) {
