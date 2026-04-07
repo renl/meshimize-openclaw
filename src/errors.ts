@@ -8,7 +8,7 @@
 
 import { MeshimizeAPIError } from "./api/client.js";
 
-// Re-export ToolResult type for convenience
+// Import ToolResult type for use in return types
 import type { ToolResult } from "openclaw/plugin-sdk/types";
 
 /**
@@ -29,6 +29,37 @@ export function errorResult(message: string): ToolResult {
     content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
     isError: true,
   };
+}
+
+/**
+ * Checks whether an error represents a network/transport failure.
+ *
+ * Matches known network error patterns in the error message, and for
+ * TypeErrors (thrown by Node.js fetch), also inspects the `.cause` property
+ * where the real network error is wrapped.
+ *
+ * A plain TypeError like "Cannot read properties of undefined" does NOT match.
+ */
+function isNetworkError(error: Error): boolean {
+  const msg = error.message.toLowerCase();
+  const networkPatterns = [
+    "econnrefused",
+    "enotfound",
+    "econnreset",
+    "etimedout",
+    "fetch failed",
+    "network",
+  ];
+
+  if (networkPatterns.some((p) => msg.includes(p))) return true;
+
+  // Node fetch() throws TypeError with cause containing the real network error
+  if (error instanceof TypeError && error.cause instanceof Error) {
+    const causeMsg = error.cause.message.toLowerCase();
+    if (networkPatterns.some((p) => causeMsg.includes(p))) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -63,15 +94,7 @@ export function formatToolError(error: unknown, baseUrl: string): string {
 
   // 2. Regular Error — could be network failure or business logic
   if (error instanceof Error) {
-    // Network errors: TypeError from fetch (DNS failure, connection refused, etc.)
-    // Also catch ECONNREFUSED-style errors
-    if (
-      error instanceof TypeError ||
-      error.message.includes("ECONNREFUSED") ||
-      error.message.includes("ENOTFOUND") ||
-      error.message.includes("fetch failed") ||
-      error.message.includes("network")
-    ) {
+    if (isNetworkError(error)) {
       return `Meshimize: Unable to reach server at ${baseUrl}`;
     }
 

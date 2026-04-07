@@ -80,6 +80,37 @@ describe("formatToolError", () => {
         "Meshimize: Unable to reach server at https://api.meshimize.com",
       );
     });
+
+    it("does NOT treat a plain TypeError as a network error", () => {
+      const error = new TypeError("Cannot read properties of undefined (reading 'foo')");
+      expect(formatToolError(error, baseUrl)).toBe(
+        "Meshimize: Cannot read properties of undefined (reading 'foo')",
+      );
+    });
+
+    it("maps TypeError with cause containing ECONNREFUSED to network error", () => {
+      const error = new TypeError("fetch failed");
+      error.cause = new Error("connect ECONNREFUSED 127.0.0.1:4000");
+      expect(formatToolError(error, baseUrl)).toBe(
+        "Meshimize: Unable to reach server at https://api.meshimize.com",
+      );
+    });
+
+    it("maps TypeError with cause containing ECONNRESET to network error", () => {
+      const error = new TypeError("terminated");
+      error.cause = new Error("ECONNRESET");
+      expect(formatToolError(error, baseUrl)).toBe(
+        "Meshimize: Unable to reach server at https://api.meshimize.com",
+      );
+    });
+
+    it("maps TypeError with cause containing ETIMEDOUT to network error", () => {
+      const error = new TypeError("terminated");
+      error.cause = new Error("connect ETIMEDOUT 10.0.0.1:443");
+      expect(formatToolError(error, baseUrl)).toBe(
+        "Meshimize: Unable to reach server at https://api.meshimize.com",
+      );
+    });
   });
 
   describe("business logic errors", () => {
