@@ -169,7 +169,7 @@ On the first `401` response, the plugin sets an internal flag. All subsequent to
 ### "Meshimize: Rate limit exceeded. Try again later."
 
 - The plugin automatically retries with exponential backoff (up to 3 attempts).
-- If you see this error, all retries were exhausted. Wait at least 60 seconds before retrying.
+- If you see this error, all retries were exhausted. Wait for the server's Retry-After period (if provided in the response) before retrying, or wait a short time and try again.
 
 ### WebSocket Not Connecting
 

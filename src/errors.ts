@@ -87,7 +87,7 @@ export function formatToolError(error: unknown, baseUrl: string): string {
       return "Meshimize: Server error";
     }
 
-    // 403, 404, 409, 422 — use server's extracted message
+    // All other non-401, non-429 MeshimizeAPIError statuses below 500 — use server's extracted message
     // MeshimizeAPIError.message already extracts from response body
     return `Meshimize: ${error.message}`;
   }
