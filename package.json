@@ -23,13 +23,14 @@
   },
   "openclaw": {
     "extensions": [
-      "tools"
+      "./index.ts"
     ],
     "compat": {
-      "gateway": ">=0.1.0"
+      "pluginApi": ">=0.1.0"
     },
     "build": {
-      "entry": "dist/index.js"
+      "openclawVersion": "0.1.0",
+      "pluginSdkVersion": "0.1.0"
     }
   },
   "engines": {
