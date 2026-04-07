@@ -14,13 +14,16 @@ import { DelegationContentBuffer } from "./buffer/delegation-content-buffer.js";
 import { createWsService } from "./services/ws-manager.js";
 import { createPendingJoinMap, PENDING_JOIN_DEFAULTS } from "./state/pending-joins.js";
 import { registerGroupTools } from "./tools/groups.js";
+import { registerMessageTools } from "./tools/messages.js";
+import { registerDirectMessageTools } from "./tools/direct-messages.js";
+import { registerDelegationTools } from "./tools/delegations.js";
 
 /**
  * Register the Meshimize plugin with the OpenClaw Gateway.
  *
  * Creates deps (REST client, buffers), creates and registers the background
  * WebSocket service. The Gateway calls service.start() when ready.
- * Tool registration is added in Slice 4+.
+ * Registers all 21 tools across 4 modules.
  */
 export function register(api: PluginAPI): void {
   const rawConfig = api.getConfig();
@@ -50,6 +53,12 @@ export function register(api: PluginAPI): void {
   // Register group tools (7 tools)
   registerGroupTools(api, { api: client, pendingJoins, wsService });
 
-  // TODO (Slice 5+): Register remaining 14 tools via api.registerTool(...)
-  // Tools will need: client, messageBuffer, delegationContentBuffer, wsService, pendingJoins
+  // Register messaging tools (4 tools)
+  registerMessageTools(api, { api: client, messageBuffer });
+
+  // Register direct message tools (2 tools)
+  registerDirectMessageTools(api, { api: client, messageBuffer });
+
+  // Register delegation tools (8 tools)
+  registerDelegationTools(api, { api: client, delegationBuffer: delegationContentBuffer });
 }
