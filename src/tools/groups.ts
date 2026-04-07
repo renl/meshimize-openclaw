@@ -15,11 +15,12 @@
  * authority session context).
  */
 
-import type { PluginAPI, ToolResult } from "openclaw/plugin-sdk/types";
+import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { PendingJoinMap } from "../state/pending-joins.js";
 import type { WsService } from "../services/ws-manager.js";
 import type { GroupResponse } from "../types/groups.js";
+import { successResult, errorResult, formatToolError } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies interface
@@ -80,23 +81,6 @@ function buildPendingJoinGroup(group: {
     type: group.type,
     owner_name: group.owner_name,
     owner_verified: group.owner_verified,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Response helpers
-// ---------------------------------------------------------------------------
-
-function successResult(data: unknown): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
-  };
-}
-
-function errorResult(message: string): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-    isError: true,
   };
 }
 
@@ -356,8 +340,7 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -376,8 +359,7 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
         const result = await listMyGroupsHandler(args as Record<string, never>, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -403,8 +385,7 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
         const result = await joinGroupHandler(args as { group_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -430,8 +411,7 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
         const result = await approveJoinHandler(args as { group_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -457,8 +437,7 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
         const result = await rejectJoinHandler(args as { group_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -477,8 +456,7 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
         const result = await listPendingJoinsHandler(args as Record<string, never>, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -504,8 +482,7 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
         const result = await leaveGroupHandler(args as { group_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });

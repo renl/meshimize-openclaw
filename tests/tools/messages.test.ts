@@ -78,9 +78,13 @@ function makePaginatedResponse<T>(
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: ReturnType<typeof vi.fn>;
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+    ? MeshimizeAPI[K]
+    : ReturnType<typeof vi.fn>;
 } {
   return {
+    invalidKey: false,
+    configBaseUrl: "https://api.meshimize.com",
     getAccount: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
@@ -513,7 +517,7 @@ describe("registerMessageTools", () => {
     const getResult = await getTool.execute({ group_id: "g-1" });
     expect(getResult.isError).toBe(true);
     const getParsed = JSON.parse(getResult.content[0].text);
-    expect(getParsed.error).toBe("test-error");
+    expect(getParsed.error).toBe("Meshimize: test-error");
 
     // Test post_message error handling
     const postTool = pluginApi._registeredTools.find((t) => t.name === "meshimize_post_message")!;

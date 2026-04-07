@@ -12,10 +12,11 @@
  * authority session context).
  */
 
-import type { PluginAPI, ToolResult } from "openclaw/plugin-sdk/types";
+import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { MessageBuffer } from "../buffer/message-buffer.js";
 import { findMyGroupById } from "./groups.js";
+import { successResult, errorResult, formatToolError } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies interface
@@ -32,23 +33,6 @@ export interface MessageToolDeps {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// ---------------------------------------------------------------------------
-// Response helpers
-// ---------------------------------------------------------------------------
-
-function successResult(data: unknown): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
-  };
-}
-
-function errorResult(message: string): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-    isError: true,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -304,8 +288,7 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -355,8 +338,7 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -398,8 +380,7 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -435,8 +416,7 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });

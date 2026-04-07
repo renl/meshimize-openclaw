@@ -63,9 +63,13 @@ function makePaginatedResponse<T>(
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: ReturnType<typeof vi.fn>;
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+    ? MeshimizeAPI[K]
+    : ReturnType<typeof vi.fn>;
 } {
   return {
+    invalidKey: false,
+    configBaseUrl: "https://api.meshimize.com",
     getAccount: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
@@ -552,7 +556,7 @@ describe("registerDelegationTools", () => {
       const result = await tool.execute(args);
       expect(result.isError).toBe(true);
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toBe("test-error");
+      expect(parsed.error).toBe("Meshimize: test-error");
     }
   });
 

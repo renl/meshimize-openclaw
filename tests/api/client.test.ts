@@ -121,3 +121,112 @@ describe("MeshimizeAPI", () => {
     }
   });
 });
+
+describe("MeshimizeAPI invalidKey fast-fail", () => {
+  it("invalidKey is false initially", () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+    expect(client.invalidKey).toBe(false);
+  });
+
+  it("sets invalidKey to true on 401 response", async () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ error: "Invalid API key" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      await expect(client.getAccount()).rejects.toThrow();
+      expect(client.invalidKey).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("fast-fails on subsequent calls after 401 without making network request", async () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ error: "Invalid API key" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    globalThis.fetch = mockFetch;
+
+    try {
+      // First call — hits network, gets 401
+      await expect(client.getAccount()).rejects.toThrow();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Reset mock call count
+      mockFetch.mockClear();
+
+      // Second call — should fast-fail without network
+      await expect(client.getAccount()).rejects.toThrow("Invalid or expired API key");
+      expect(mockFetch).toHaveBeenCalledTimes(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("does NOT set invalidKey on non-401 errors", async () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ error: "Not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      await expect(client.getAccount()).rejects.toThrow();
+      expect(client.invalidKey).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("MeshimizeAPI configBaseUrl", () => {
+  it("returns baseUrl without /api/v1 suffix", () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+    expect(client.configBaseUrl).toBe("https://api.meshimize.com");
+  });
+
+  it("handles localhost baseUrl", () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "http://localhost:4000",
+      wsUrl: "ws://localhost:4000/api/v1/ws/websocket",
+    });
+    expect(client.configBaseUrl).toBe("http://localhost:4000");
+  });
+});

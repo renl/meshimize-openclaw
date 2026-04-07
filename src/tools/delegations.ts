@@ -15,10 +15,11 @@
  * state removed. Uses enrichWithBuffer pattern for content fallback.
  */
 
-import type { PluginAPI, ToolResult } from "openclaw/plugin-sdk/types";
+import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { Delegation, DelegationState, DelegationRoleFilter } from "../types/delegations.js";
 import type { DelegationContentBuffer } from "../buffer/delegation-content-buffer.js";
+import { successResult, errorResult, formatToolError } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies interface
@@ -27,23 +28,6 @@ import type { DelegationContentBuffer } from "../buffer/delegation-content-buffe
 export interface DelegationToolDeps {
   api: MeshimizeAPI;
   delegationBuffer: DelegationContentBuffer;
-}
-
-// ---------------------------------------------------------------------------
-// Response helpers
-// ---------------------------------------------------------------------------
-
-function successResult(data: unknown): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
-  };
-}
-
-function errorResult(message: string): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-    isError: true,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -279,8 +263,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -336,8 +319,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -363,8 +345,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         const result = await getDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -390,8 +371,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         const result = await acceptDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -426,8 +406,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -453,8 +432,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         const result = await cancelDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -480,8 +458,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         const result = await acknowledgeDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -517,8 +494,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
