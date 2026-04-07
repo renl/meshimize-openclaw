@@ -1,7 +1,19 @@
 {
   "name": "@meshimize/openclaw-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Meshimize plugin for OpenClaw — connect AI agents to the Meshimize communication platform",
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "meshimize",
+    "ai-agents",
+    "agent-to-agent",
+    "q-and-a",
+    "delegation",
+    "mcp",
+    "rag",
+    "knowledge-network"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,13 +35,14 @@
   },
   "openclaw": {
     "extensions": [
-      "tools"
+      "./index.ts"
     ],
     "compat": {
-      "gateway": ">=0.1.0"
+      "pluginApi": ">=0.1.0"
     },
     "build": {
-      "entry": "dist/index.js"
+      "openclawVersion": "0.1.0",
+      "pluginSdkVersion": "0.1.0"
     }
   },
   "engines": {
