@@ -60,6 +60,7 @@ export class MeshimizeAPIError extends Error {
 export class MeshimizeAPI {
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private _invalidKey: boolean = false;
 
   constructor(config: Config) {
     // Strip trailing slash from baseUrl, then append /api/v1
@@ -67,7 +68,22 @@ export class MeshimizeAPI {
     this.apiKey = config.apiKey;
   }
 
+  /** Returns true if a 401 response has been received, indicating the API key is invalid. */
+  get invalidKey(): boolean {
+    return this._invalidKey;
+  }
+
+  /** Returns the configured base URL (without /api/v1 suffix). */
+  get configBaseUrl(): string {
+    return this.baseUrl.replace(/\/api\/v1$/, "");
+  }
+
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    // Fast-fail if key is known to be invalid
+    if (this._invalidKey) {
+      throw new MeshimizeAPIError(401, { error: "Invalid or expired API key" });
+    }
+
     const maxAttempts = 3;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -145,6 +161,9 @@ export class MeshimizeAPI {
       }
 
       // Non-retryable error or retries exhausted
+      if (response.status === 401) {
+        this._invalidKey = true;
+      }
       throw new MeshimizeAPIError(response.status, errorBody);
     }
 

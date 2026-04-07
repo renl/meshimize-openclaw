@@ -9,9 +9,10 @@
  * state removed.
  */
 
-import type { PluginAPI, ToolResult } from "openclaw/plugin-sdk/types";
+import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { MessageBuffer } from "../buffer/message-buffer.js";
+import { successResult, errorResult, formatToolError } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies interface
@@ -20,23 +21,6 @@ import type { MessageBuffer } from "../buffer/message-buffer.js";
 export interface DirectMessageToolDeps {
   api: MeshimizeAPI;
   messageBuffer: MessageBuffer;
-}
-
-// ---------------------------------------------------------------------------
-// Response helpers
-// ---------------------------------------------------------------------------
-
-function successResult(data: unknown): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
-  };
-}
-
-function errorResult(message: string): ToolResult {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-    isError: true,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -121,8 +105,7 @@ export function registerDirectMessageTools(api: PluginAPI, deps: DirectMessageTo
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });
@@ -157,8 +140,7 @@ export function registerDirectMessageTools(api: PluginAPI, deps: DirectMessageTo
         );
         return successResult(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        return errorResult(message);
+        return errorResult(formatToolError(error, deps.api.configBaseUrl));
       }
     },
   });

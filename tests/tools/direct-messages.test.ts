@@ -58,9 +58,13 @@ function makePaginatedResponse<T>(
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: ReturnType<typeof vi.fn>;
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+    ? MeshimizeAPI[K]
+    : ReturnType<typeof vi.fn>;
 } {
   return {
+    invalidKey: false,
+    configBaseUrl: "https://api.meshimize.com",
     getAccount: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
@@ -223,7 +227,7 @@ describe("registerDirectMessageTools", () => {
     });
     expect(sendResult.isError).toBe(true);
     const sendParsed = JSON.parse(sendResult.content[0].text);
-    expect(sendParsed.error).toBe("test-error");
+    expect(sendParsed.error).toBe("Meshimize: test-error");
 
     // Test get_direct_messages error handling
     const getTool = pluginApi._registeredTools.find(

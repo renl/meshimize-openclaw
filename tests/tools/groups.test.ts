@@ -71,9 +71,13 @@ function makePendingJoinRequest(overrides: Partial<PendingJoinRequest> = {}): Pe
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: ReturnType<typeof vi.fn>;
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+    ? MeshimizeAPI[K]
+    : ReturnType<typeof vi.fn>;
 } {
   return {
+    invalidKey: false,
+    configBaseUrl: "https://api.meshimize.com",
     getAccount: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
@@ -534,7 +538,7 @@ describe("registerGroupTools", () => {
     const searchResult = await searchTool.execute({});
     expect(searchResult.isError).toBe(true);
     const searchParsed = JSON.parse(searchResult.content[0].text);
-    expect(searchParsed.error).toBe("test-error");
+    expect(searchParsed.error).toBe("Meshimize: test-error");
 
     // Test list_my_groups error handling
     const listTool = pluginApi._registeredTools.find((t) => t.name === "meshimize_list_my_groups")!;
