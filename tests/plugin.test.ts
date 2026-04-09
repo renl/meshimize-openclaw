@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import pluginEntry from "../src/index.js";
 import { createMockPluginAPI } from "./__mocks__/openclaw-plugin-sdk/api.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const manifest = JSON.parse(
+  readFileSync(resolve(__dirname, "../openclaw.plugin.json"), "utf-8"),
+) as { id: string; name: string; description: string };
 
 // Save and clear env vars to ensure test hermeticity
 const ENV_KEYS = ["MESHIMIZE_API_KEY", "MESHIMIZE_BASE_URL", "MESHIMIZE_WS_URL"] as const;
@@ -28,14 +36,14 @@ describe("plugin", () => {
   describe("pluginEntry structure", () => {
     it("is a valid plugin entry object", () => {
       expect(pluginEntry).toBeDefined();
-      expect(pluginEntry.id).toBe("meshimize");
-      expect(pluginEntry.name).toBe("Meshimize");
-      expect(typeof pluginEntry.description).toBe("string");
+      expect(pluginEntry.id).toBe(manifest.id);
+      expect(pluginEntry.name).toBe(manifest.name);
+      expect(pluginEntry.description).toBe(manifest.description);
       expect(typeof pluginEntry.register).toBe("function");
     });
 
     it("has the correct id matching openclaw.plugin.json", () => {
-      expect(pluginEntry.id).toBe("meshimize");
+      expect(pluginEntry.id).toBe(manifest.id);
     });
   });
 
