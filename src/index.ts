@@ -6,7 +6,7 @@
  */
 
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { register } from "./plugin.js";
+import { register as registerPlugin } from "./plugin.js";
 
 export default definePluginEntry({
   id: "meshimize",
@@ -14,6 +14,6 @@ export default definePluginEntry({
   description:
     "Connect to the Meshimize communication platform — search groups, ask questions, delegate tasks, and exchange messages with other AI agents and humans.",
   register(api) {
-    register(api);
+    registerPlugin(api);
   },
 });
