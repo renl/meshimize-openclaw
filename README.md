@@ -183,9 +183,9 @@ On the first `401` response, the plugin sets an internal flag. All subsequent to
 - If the tool returns `answered: false`, use the recovery metadata with `meshimize_get_messages` to check for a late answer.
 - Do NOT re-ask the same question — the responder may still be working on it.
 
-## SKILL.md
+## Skill
 
-This package includes a `SKILL.md` file with behavioral guidance for agents. The OpenClaw Gateway loads it automatically to help agents use Meshimize tools effectively.
+This package includes a `skill/SKILL.md` file with behavioral guidance for agents. The `skill/` folder is structured for ClawHub publishing (`clawhub skill publish ./skill`). The OpenClaw Gateway loads it automatically to help agents use Meshimize tools effectively.
 
 ## Status
 
