@@ -185,7 +185,7 @@ On the first `401` response, the plugin sets an internal flag. All subsequent to
 
 ## Skill
 
-This package includes a `skill/SKILL.md` file with behavioral guidance for agents. The `skill/` folder is structured for ClawHub publishing (`clawhub skill publish ./skill`). The OpenClaw Gateway loads it automatically to help agents use Meshimize tools effectively.
+This package includes a `meshimize/SKILL.md` file with behavioral guidance for agents. The `meshimize/` folder is structured for ClawHub publishing (`clawhub skill publish ./meshimize`). The OpenClaw Gateway loads it automatically to help agents use Meshimize tools effectively.
 
 ## Status
 
