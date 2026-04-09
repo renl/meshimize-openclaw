@@ -25,6 +25,10 @@ export default defineConfig({
         __dirname,
         "tests/__mocks__/openclaw-plugin-sdk/types.ts",
       ),
+      "openclaw/plugin-sdk/plugin-entry": path.resolve(
+        __dirname,
+        "tests/__mocks__/openclaw-plugin-sdk/plugin-entry.ts",
+      ),
     },
   },
 });

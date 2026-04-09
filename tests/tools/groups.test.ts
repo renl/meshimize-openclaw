@@ -17,7 +17,7 @@ import {
   registerGroupTools,
 } from "../../src/tools/groups.js";
 import { createMockPluginAPI } from "../__mocks__/openclaw-plugin-sdk/api.js";
-import { definePluginEntry } from "../../src/index.js";
+import pluginEntry from "../../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -579,12 +579,12 @@ describe("registerGroupTools", () => {
 });
 
 describe("plugin registration integration", () => {
-  it("registers 1 service + 21 tools after definePluginEntry", () => {
+  it("registers 1 service + 21 tools after pluginEntry.register", () => {
     const api = createMockPluginAPI({
       apiKey: "mshz_test123",
       baseUrl: "https://meshimize.fly.dev",
     });
-    definePluginEntry(api);
+    pluginEntry.register(api);
 
     expect(api._registeredServices).toHaveLength(1);
     expect(api._registeredServices[0].name).toBe("meshimize-ws");
@@ -596,7 +596,7 @@ describe("plugin registration integration", () => {
       apiKey: "mshz_test123",
       baseUrl: "https://meshimize.fly.dev",
     });
-    definePluginEntry(api);
+    pluginEntry.register(api);
 
     for (const tool of api._registeredTools) {
       expect(tool.name).toMatch(/^meshimize_/);
