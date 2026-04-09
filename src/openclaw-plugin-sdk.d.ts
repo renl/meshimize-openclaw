@@ -40,3 +40,27 @@ declare module "openclaw/plugin-sdk/api" {
     config: Record<string, unknown>,
   ): import("openclaw/plugin-sdk/types").PluginAPI;
 }
+
+declare module "openclaw/plugin-sdk/plugin-entry" {
+  import type { PluginAPI } from "openclaw/plugin-sdk/types";
+
+  export interface PluginEntryConfig {
+    id: string;
+    name: string;
+    description: string;
+    kind?: string;
+    configSchema?: Record<string, unknown> | (() => Record<string, unknown>);
+    register: (api: PluginAPI) => void;
+  }
+
+  export interface PluginEntry {
+    id: string;
+    name: string;
+    description: string;
+    kind?: string;
+    configSchema?: Record<string, unknown> | (() => Record<string, unknown>);
+    register: (api: PluginAPI) => void;
+  }
+
+  export function definePluginEntry(config: PluginEntryConfig): PluginEntry;
+}

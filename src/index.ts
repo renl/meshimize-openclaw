@@ -1,16 +1,19 @@
 /**
  * @meshimize/openclaw-plugin — Plugin entry point.
  *
- * Exports `definePluginEntry` which the OpenClaw Gateway calls to load the plugin.
+ * Uses the OpenClaw SDK's `definePluginEntry` helper to declare the plugin.
+ * The Gateway resolves the default export and calls `register(api)` to load.
  */
 
-import type { PluginAPI } from "openclaw/plugin-sdk/types";
+import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { register } from "./plugin.js";
 
-/**
- * OpenClaw plugin entry point.
- * Called by the Gateway to initialize and register plugin capabilities.
- */
-export function definePluginEntry(api: PluginAPI): void {
-  register(api);
-}
+export default definePluginEntry({
+  id: "meshimize",
+  name: "Meshimize",
+  description:
+    "Connect to the Meshimize communication platform — search groups, ask questions, delegate tasks, and exchange messages with other AI agents and humans.",
+  register(api) {
+    register(api);
+  },
+});

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { definePluginEntry } from "../src/index.js";
+import pluginEntry from "../src/index.js";
 import { createMockPluginAPI } from "./__mocks__/openclaw-plugin-sdk/api.js";
 
 // Save and clear env vars to ensure test hermeticity
@@ -25,29 +25,37 @@ describe("plugin", () => {
     }
   });
 
-  describe("definePluginEntry", () => {
-    it("exports a function", () => {
-      expect(typeof definePluginEntry).toBe("function");
+  describe("pluginEntry structure", () => {
+    it("is a valid plugin entry object", () => {
+      expect(pluginEntry).toBeDefined();
+      expect(pluginEntry.id).toBe("meshimize");
+      expect(pluginEntry.name).toBe("Meshimize");
+      expect(typeof pluginEntry.description).toBe("string");
+      expect(typeof pluginEntry.register).toBe("function");
     });
 
-    it("does not throw with valid config", () => {
-      const api = createMockPluginAPI({ apiKey: "mshz_test123" });
-      expect(() => definePluginEntry(api)).not.toThrow();
-    });
-
-    it("throws when apiKey is missing from config", () => {
-      const api = createMockPluginAPI({});
-      expect(() => definePluginEntry(api)).toThrow("API key not configured");
+    it("has the correct id matching openclaw.plugin.json", () => {
+      expect(pluginEntry.id).toBe("meshimize");
     });
   });
 
   describe("register", () => {
+    it("does not throw with valid config", () => {
+      const api = createMockPluginAPI({ apiKey: "mshz_test123" });
+      expect(() => pluginEntry.register(api)).not.toThrow();
+    });
+
+    it("throws when apiKey is missing from config", () => {
+      const api = createMockPluginAPI({});
+      expect(() => pluginEntry.register(api)).toThrow("API key not configured");
+    });
+
     it("accepts valid config and creates REST client without error", () => {
       const api = createMockPluginAPI({
         apiKey: "mshz_test123",
         baseUrl: "https://meshimize.fly.dev",
       });
-      expect(() => definePluginEntry(api)).not.toThrow();
+      expect(() => pluginEntry.register(api)).not.toThrow();
     });
 
     it("registers the WS service via api.registerService", () => {
@@ -55,7 +63,7 @@ describe("plugin", () => {
         apiKey: "mshz_test123",
         baseUrl: "https://meshimize.fly.dev",
       });
-      definePluginEntry(api);
+      pluginEntry.register(api);
 
       expect(api._registeredServices).toHaveLength(1);
       expect(api._registeredServices[0].name).toBe("meshimize-ws");
