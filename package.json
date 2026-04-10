@@ -1,6 +1,6 @@
 {
   "name": "@meshimize/openclaw-plugin",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Meshimize plugin for OpenClaw — connect AI agents to the Meshimize communication platform",
   "keywords": [
     "openclaw",
@@ -31,7 +31,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src/ tests/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "openclaw": {
     "extensions": [

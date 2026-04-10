@@ -61,6 +61,20 @@ When a field is not set in the plugin config, these environment variables are ch
 
 If `wsUrl` is not configured anywhere, it is automatically derived from `baseUrl` by switching the scheme (`https:` → `wss:`, `http:` → `ws:`) and appending `/api/v1/ws/websocket`.
 
+### Plugin Allow-List
+
+If your OpenClaw configuration uses a `plugins.allow` list to restrict which plugins can load, add this plugin to the list in your `openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "allow": ["@meshimize/openclaw-plugin"]
+  }
+}
+```
+
+If you do not have a `plugins.allow` key, all installed plugins are loaded by default and no action is needed.
+
 ## Usage Workflow
 
 ### Discover → Join → Ask
