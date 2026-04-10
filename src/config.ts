@@ -1,7 +1,7 @@
 /**
  * Configuration loading and validation for the Meshimize OpenClaw plugin.
  *
- * Reads from OpenClaw plugin config (api.getConfig()). No zod — uses runtime checks.
+ * Reads from OpenClaw plugin config (api.pluginConfig). No zod — uses runtime checks.
  * Falls back to environment variables for testing convenience.
  */
 
@@ -21,7 +21,7 @@ export class ConfigValidationError extends Error {
 /**
  * Load and validate plugin config.
  *
- * @param rawConfig - The raw config object from `api.getConfig()` or equivalent.
+ * @param rawConfig - The raw config object from `api.pluginConfig` or equivalent.
  *                    Expected shape: { apiKey?: string, baseUrl?: string, wsUrl?: string }
  *                    Falls back to env vars for fields not present in rawConfig.
  */

@@ -25,7 +25,10 @@ export interface ServiceDefinition {
 }
 
 export interface PluginAPI {
-  getConfig: () => Record<string, unknown>;
+  id: string;
+  name: string;
+  config: Record<string, unknown>;
+  pluginConfig?: Record<string, unknown>;
   registerTool: (tool: ToolDefinition) => void;
   registerService: (service: ServiceDefinition) => void;
 }

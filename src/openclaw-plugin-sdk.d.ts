@@ -6,7 +6,7 @@
  * This file provides TypeScript with the type information for compilation.
  *
  * The real SDK is NOT an npm package — these declarations define the minimal
- * interface the plugin depends on: getConfig(), registerTool(), registerService().
+ * interface the plugin depends on: pluginConfig, registerTool(), registerService().
  */
 
 declare module "openclaw/plugin-sdk/types" {
@@ -29,7 +29,10 @@ declare module "openclaw/plugin-sdk/types" {
   }
 
   export interface PluginAPI {
-    getConfig: () => Record<string, unknown>;
+    id: string;
+    name: string;
+    config: Record<string, unknown>;
+    pluginConfig?: Record<string, unknown>;
     registerTool: (tool: ToolDefinition) => void;
     registerService: (service: ServiceDefinition) => void;
   }

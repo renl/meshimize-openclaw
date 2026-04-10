@@ -26,7 +26,7 @@ import { registerDelegationTools } from "./tools/delegations.js";
  * Registers all 21 tools across 4 modules.
  */
 export function register(api: PluginAPI): void {
-  const rawConfig = api.getConfig();
+  const rawConfig = api.pluginConfig ?? {};
   const config = loadConfig(rawConfig);
 
   // Create the REST client

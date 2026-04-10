@@ -20,7 +20,10 @@ export function createMockPluginAPI(config: Record<string, unknown> = {}): MockP
     _registeredTools: registeredTools,
     _registeredServices: registeredServices,
     _config: config,
-    getConfig: () => config,
+    id: "meshimize-plugin",
+    name: "Meshimize",
+    config: {},
+    pluginConfig: config,
     registerTool: (tool: ToolDefinition) => {
       registeredTools.push(tool);
     },
