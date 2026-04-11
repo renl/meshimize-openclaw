@@ -23,6 +23,7 @@ declare module "openclaw/plugin-sdk/types" {
   }
 
   export interface ServiceDefinition {
+    id: string;
     name: string;
     start: () => Promise<void> | void;
     stop?: () => Promise<void> | void;
