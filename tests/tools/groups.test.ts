@@ -116,6 +116,7 @@ function createMockWsService(): {
   [K in keyof WsService]: ReturnType<typeof vi.fn> | string;
 } {
   return {
+    id: "meshimize-ws",
     name: "meshimize-ws",
     start: vi.fn(),
     stop: vi.fn(),
@@ -588,6 +589,7 @@ describe("plugin registration integration", () => {
 
     expect(api._registeredServices).toHaveLength(1);
     expect(api._registeredServices[0].name).toBe("meshimize-ws");
+    expect(api._registeredServices[0].id).toBe("meshimize-ws");
     expect(api._registeredTools).toHaveLength(21);
   });
 

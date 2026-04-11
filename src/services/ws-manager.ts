@@ -297,6 +297,7 @@ export function createWsService(deps: WsManagerDeps): WsService {
   }
 
   return {
+    id: "meshimize-ws",
     name: "meshimize-ws",
     start,
     stop,

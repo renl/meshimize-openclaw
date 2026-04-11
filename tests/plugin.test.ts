@@ -75,6 +75,7 @@ describe("plugin", () => {
 
       expect(api._registeredServices).toHaveLength(1);
       expect(api._registeredServices[0].name).toBe("meshimize-ws");
+      expect(api._registeredServices[0].id).toBe("meshimize-ws");
       expect(typeof api._registeredServices[0].start).toBe("function");
       expect(typeof api._registeredServices[0].stop).toBe("function");
     });
