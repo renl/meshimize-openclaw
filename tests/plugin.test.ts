@@ -8,7 +8,7 @@ import { createMockPluginAPI } from "./__mocks__/openclaw-plugin-sdk/api.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const manifest = JSON.parse(
   readFileSync(resolve(__dirname, "../openclaw.plugin.json"), "utf-8"),
-) as { id: string; name: string; description: string };
+) as { id: string; name: string; description: string; configSchema?: Record<string, unknown> };
 
 // Save and clear env vars to ensure test hermeticity
 const ENV_KEYS = ["MESHIMIZE_API_KEY", "MESHIMIZE_BASE_URL", "MESHIMIZE_WS_URL"] as const;
@@ -44,6 +44,11 @@ describe("plugin", () => {
 
     it("has the correct id matching openclaw.plugin.json", () => {
       expect(pluginEntry.id).toBe(manifest.id);
+    });
+
+    it("includes configSchema matching openclaw.plugin.json", () => {
+      expect(pluginEntry.configSchema).toBeDefined();
+      expect(pluginEntry.configSchema).toEqual(manifest.configSchema);
     });
   });
 
