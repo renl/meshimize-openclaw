@@ -207,7 +207,7 @@ describe("WsManager — createWsService", () => {
     vi.clearAllMocks();
   });
 
-  it("returns a ServiceDefinition with id, name, start, and stop", () => {
+  it("returns a ServiceDefinition with id, start, and stop", () => {
     const service = createWsService({
       config,
       api: mockApi,
@@ -215,7 +215,6 @@ describe("WsManager — createWsService", () => {
       delegationContentBuffer,
     });
 
-    expect(service.name).toBe("meshimize-ws");
     expect(service.id).toBe("meshimize-ws");
     expect(typeof service.start).toBe("function");
     expect(typeof service.stop).toBe("function");

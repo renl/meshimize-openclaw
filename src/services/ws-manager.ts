@@ -16,7 +16,10 @@ import type { DelegationContentBuffer } from "../buffer/delegation-content-buffe
 import type { MeshimizeAPI } from "../api/client.js";
 import type { Config } from "../config.js";
 import type { MessageDataResponse, DirectMessageDataResponse } from "../types/messages.js";
-import type { ServiceDefinition } from "openclaw/plugin-sdk/types";
+import type {
+  OpenClawPluginService,
+  OpenClawPluginServiceContext,
+} from "openclaw/plugin-sdk/types";
 
 export interface WsManagerDeps {
   config: Config;
@@ -29,7 +32,7 @@ export interface WsManagerDeps {
  * Extended service type that exposes internal methods for tool implementations.
  * Tools (Slice 4+) call subscribeToGroup/unsubscribeFromGroup when the agent joins/leaves groups.
  */
-export interface WsService extends ServiceDefinition {
+export interface WsService extends OpenClawPluginService {
   subscribeToGroup: (groupId: string) => Promise<void>;
   unsubscribeFromGroup: (groupId: string) => Promise<void>;
   getSocket: () => PhoenixSocket | null;
@@ -51,7 +54,7 @@ export function createWsService(deps: WsManagerDeps): WsService {
   let sigTermHandler: (() => void) | null = null;
   let sigIntHandler: (() => void) | null = null;
 
-  async function start(): Promise<void> {
+  async function start(_ctx?: OpenClawPluginServiceContext): Promise<void> {
     // Guard against double-start: stop existing socket before creating a new one (PR review R2)
     if (socket) {
       stop();
@@ -272,7 +275,7 @@ export function createWsService(deps: WsManagerDeps): WsService {
     }
   }
 
-  function stop(): void {
+  function stop(_ctx?: OpenClawPluginServiceContext): void {
     // Remove signal handlers to prevent listener leaks (Fix 3)
     if (sigTermHandler) {
       process.removeListener("SIGTERM", sigTermHandler);
@@ -298,7 +301,6 @@ export function createWsService(deps: WsManagerDeps): WsService {
 
   return {
     id: "meshimize-ws",
-    name: "meshimize-ws",
     start,
     stop,
     subscribeToGroup,

@@ -1,6 +1,6 @@
 {
   "name": "@meshimize/openclaw-plugin",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Meshimize plugin for OpenClaw — connect AI agents to the Meshimize communication platform",
   "keywords": [
     "openclaw",
@@ -56,6 +56,7 @@
     "url": "https://github.com/renl/meshimize-openclaw.git"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

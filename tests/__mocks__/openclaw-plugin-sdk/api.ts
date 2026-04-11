@@ -4,17 +4,17 @@
  * Provides factory functions to create mock PluginAPI instances for testing.
  */
 
-import type { PluginAPI, ToolDefinition, ServiceDefinition } from "./types.js";
+import type { OpenClawPluginApi, AgentTool, OpenClawPluginService, PluginAPI } from "./types.js";
 
-export interface MockPluginAPI extends PluginAPI {
-  _registeredTools: ToolDefinition[];
-  _registeredServices: ServiceDefinition[];
+export interface MockPluginAPI extends OpenClawPluginApi {
+  _registeredTools: AgentTool[];
+  _registeredServices: OpenClawPluginService[];
   _config: Record<string, unknown>;
 }
 
 export function createMockPluginAPI(config: Record<string, unknown> = {}): MockPluginAPI {
-  const registeredTools: ToolDefinition[] = [];
-  const registeredServices: ServiceDefinition[] = [];
+  const registeredTools: AgentTool[] = [];
+  const registeredServices: OpenClawPluginService[] = [];
 
   return {
     _registeredTools: registeredTools,
@@ -24,10 +24,10 @@ export function createMockPluginAPI(config: Record<string, unknown> = {}): MockP
     name: "Meshimize",
     config: {},
     pluginConfig: config,
-    registerTool: (tool: ToolDefinition) => {
+    registerTool: (tool: AgentTool) => {
       registeredTools.push(tool);
     },
-    registerService: (service: ServiceDefinition) => {
+    registerService: (service: OpenClawPluginService) => {
       registeredServices.push(service);
     },
   };

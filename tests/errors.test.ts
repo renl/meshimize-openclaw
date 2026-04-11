@@ -150,18 +150,18 @@ describe("successResult", () => {
     });
   });
 
-  it("does not set isError", () => {
+  it("does not set details on success", () => {
     const result = successResult("ok");
-    expect(result.isError).toBeUndefined();
+    expect((result as Record<string, unknown>).details).toBeUndefined();
   });
 });
 
 describe("errorResult", () => {
-  it("wraps message as JSON error with isError flag", () => {
+  it("wraps message as JSON error with details error flag", () => {
     const result = errorResult("something went wrong");
     expect(result).toEqual({
       content: [{ type: "text", text: JSON.stringify({ error: "something went wrong" }) }],
-      isError: true,
+      details: { error: true },
     });
   });
 });

@@ -523,7 +523,7 @@ describe("registerDelegationTools", () => {
     }
   });
 
-  it("each execute wrapper catches errors and returns isError result", async () => {
+  it("each execute wrapper catches errors and returns error result with details", async () => {
     const pluginApi = createMockPluginAPI({ apiKey: "mshz_test123" });
     const deps = createDeps();
 
@@ -553,8 +553,8 @@ describe("registerDelegationTools", () => {
         args.delegation_id = "del-1";
       }
 
-      const result = await tool.execute(args);
-      expect(result.isError).toBe(true);
+      const result = await tool.execute("test-id", args);
+      expect((result as Record<string, unknown>).details).toEqual({ error: true });
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.error).toBe("Meshimize: test-error");
     }
@@ -569,9 +569,9 @@ describe("registerDelegationTools", () => {
     registerDelegationTools(pluginApi, deps);
 
     const tool = pluginApi._registeredTools.find((t) => t.name === "meshimize_create_delegation")!;
-    const result = await tool.execute({ group_id: "g-1", description: "task" });
+    const result = await tool.execute("test-id", { group_id: "g-1", description: "task" });
 
-    expect(result.isError).toBeUndefined();
+    expect((result as Record<string, unknown>).details).toBeUndefined();
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe("text");
     const parsed = JSON.parse(result.content[0].text);
