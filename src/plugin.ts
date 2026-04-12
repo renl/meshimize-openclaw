@@ -7,7 +7,7 @@
  */
 
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
-import { loadConfig } from "./config.js";
+import { loadConfig, ConfigValidationError } from "./config.js";
 import { MeshimizeAPI } from "./api/client.js";
 import { MessageBuffer } from "./buffer/message-buffer.js";
 import { DelegationContentBuffer } from "./buffer/delegation-content-buffer.js";
@@ -27,7 +27,17 @@ import { registerDelegationTools } from "./tools/delegations.js";
  */
 export function register(api: PluginAPI): void {
   const rawConfig = api.pluginConfig ?? {};
-  const config = loadConfig(rawConfig);
+
+  let config;
+  try {
+    config = loadConfig(rawConfig);
+  } catch (e: unknown) {
+    if (e instanceof ConfigValidationError) {
+      console.warn(`[meshimize] Plugin registration skipped: ${e.message}`);
+      return;
+    }
+    throw e;
+  }
 
   // Create the REST client
   const client = new MeshimizeAPI(config);

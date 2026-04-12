@@ -19,7 +19,6 @@
         "type": "string",
         "description": "WebSocket URL for real-time features (default: derived from baseUrl)"
       }
-    },
-    "required": ["apiKey"]
+    }
   }
 }
