@@ -21,21 +21,6 @@ export default definePluginEntry({
           error: { issues: [{ message: "expected config object" }] },
         };
       }
-      const v = value as Record<string, unknown>;
-      if (!v.apiKey || typeof v.apiKey !== "string") {
-        return {
-          success: false,
-          error: { issues: [{ message: "apiKey is required" }] },
-        };
-      }
-      if (typeof v.apiKey === "string" && !v.apiKey.startsWith("mshz_")) {
-        return {
-          success: false,
-          error: {
-            issues: [{ message: "apiKey must start with mshz_" }],
-          },
-        };
-      }
       return { success: true, data: value };
     },
     jsonSchema: {
@@ -56,7 +41,6 @@ export default definePluginEntry({
           description: "WebSocket URL for real-time features (default: derived from baseUrl)",
         },
       },
-      required: ["apiKey"],
     },
   },
   register(api) {

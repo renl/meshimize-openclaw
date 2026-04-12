@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,9 +59,30 @@ describe("plugin", () => {
       expect(() => pluginEntry.register(api)).not.toThrow();
     });
 
-    it("throws when apiKey is missing from config", () => {
+    it("does not throw when apiKey is missing from config", () => {
       const api = createMockPluginAPI({});
-      expect(() => pluginEntry.register(api)).toThrow("API key not configured");
+      expect(() => pluginEntry.register(api)).not.toThrow();
+    });
+
+    it("logs warning and returns early when config is missing", () => {
+      const api = createMockPluginAPI({});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      pluginEntry.register(api);
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[meshimize]"));
+      expect(api._registeredServices).toHaveLength(0);
+      expect(api._registeredTools).toHaveLength(0);
+
+      warnSpy.mockRestore();
+    });
+
+    it("does not register tools or services when config validation fails", () => {
+      const api = createMockPluginAPI({ apiKey: "invalid_key" });
+      pluginEntry.register(api);
+
+      expect(api._registeredServices).toHaveLength(0);
+      expect(api._registeredTools).toHaveLength(0);
     });
 
     it("accepts valid config and creates REST client without error", () => {
@@ -83,6 +104,18 @@ describe("plugin", () => {
       expect(api._registeredServices[0].id).toBe("meshimize-ws");
       expect(typeof api._registeredServices[0].start).toBe("function");
       expect(typeof api._registeredServices[0].stop).toBe("function");
+    });
+  });
+
+  describe("configSchema.safeParse", () => {
+    it("safeParse accepts object without apiKey", () => {
+      const result = pluginEntry.configSchema!.safeParse({});
+      expect(result.success).toBe(true);
+    });
+
+    it("safeParse rejects non-object values", () => {
+      const result = pluginEntry.configSchema!.safeParse("not-an-object");
+      expect(result.success).toBe(false);
     });
   });
 });
