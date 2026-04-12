@@ -26,7 +26,13 @@ import { registerDelegationTools } from "./tools/delegations.js";
  * Registers all 21 tools across 4 modules.
  */
 export function register(api: PluginAPI): void {
-  const rawConfig = api.pluginConfig ?? {};
+  // Resolve config: prefer api.pluginConfig (gateway mode), fall back to
+  // api.config.plugins.entries.meshimize.config (per-session mode where
+  // pluginConfig is undefined but full config tree is available).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const perSessionConfig = (api.config as Record<string, any>)?.plugins?.entries?.meshimize
+    ?.config as Record<string, unknown> | undefined;
+  const rawConfig = api.pluginConfig ?? perSessionConfig ?? {};
 
   let config;
   try {
