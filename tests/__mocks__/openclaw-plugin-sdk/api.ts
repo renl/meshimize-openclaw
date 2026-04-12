@@ -12,17 +12,20 @@ export interface MockPluginAPI extends OpenClawPluginApi {
   _config: Record<string, unknown>;
 }
 
-export function createMockPluginAPI(config: Record<string, unknown> = {}): MockPluginAPI {
+export function createMockPluginAPI(
+  config?: Record<string, unknown>,
+  fullConfig?: Record<string, unknown>,
+): MockPluginAPI {
   const registeredTools: AgentTool[] = [];
   const registeredServices: OpenClawPluginService[] = [];
 
   return {
     _registeredTools: registeredTools,
     _registeredServices: registeredServices,
-    _config: config,
+    _config: config ?? {},
     id: "meshimize-plugin",
     name: "Meshimize",
-    config: {},
+    config: fullConfig ?? {},
     pluginConfig: config,
     registerTool: (tool: AgentTool) => {
       registeredTools.push(tool);

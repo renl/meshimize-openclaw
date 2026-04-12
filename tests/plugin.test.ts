@@ -105,6 +105,38 @@ describe("plugin", () => {
       expect(typeof api._registeredServices[0].start).toBe("function");
       expect(typeof api._registeredServices[0].stop).toBe("function");
     });
+
+    it("registers tools when pluginConfig is undefined but config.plugins.entries.meshimize.config has valid config", () => {
+      const api = createMockPluginAPI(undefined, {
+        plugins: {
+          entries: {
+            meshimize: {
+              config: { apiKey: "mshz_test123" },
+            },
+          },
+        },
+      });
+
+      pluginEntry.register(api);
+
+      // Should have resolved config from the per-session fallback path
+      expect(api._registeredServices).toHaveLength(1);
+      expect(api._registeredTools.length).toBeGreaterThan(0);
+      expect(api._registeredTools).toHaveLength(21);
+    });
+
+    it("logs warning when both pluginConfig and config.plugins.entries.meshimize.config are absent", () => {
+      const api = createMockPluginAPI(undefined, {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      pluginEntry.register(api);
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[meshimize]"));
+      expect(api._registeredServices).toHaveLength(0);
+      expect(api._registeredTools).toHaveLength(0);
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe("configSchema.safeParse", () => {
