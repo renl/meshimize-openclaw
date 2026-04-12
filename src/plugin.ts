@@ -7,6 +7,9 @@
  */
 
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { loadConfig, ConfigValidationError } from "./config.js";
 import { MeshimizeAPI } from "./api/client.js";
 import { MessageBuffer } from "./buffer/message-buffer.js";
@@ -26,13 +29,29 @@ import { registerDelegationTools } from "./tools/delegations.js";
  * Registers all 21 tools across 4 modules.
  */
 export function register(api: PluginAPI): void {
-  // Resolve config: prefer api.pluginConfig (gateway mode), fall back to
-  // api.config.plugins.entries.meshimize.config (per-session mode where
-  // pluginConfig is undefined but full config tree is available).
+  // Resolve config with full fallback chain:
+  // 1. api.pluginConfig (gateway mode) — skip if empty object
+  // 2. api.config.plugins.entries.meshimize.config (per-session with full config tree)
+  // 3. Read ~/.openclaw/openclaw.json from disk (always available on OpenClaw installs)
+  // 4. {} — will fail validation in loadConfig (env vars may still save it)
+  const pluginConfig = api.pluginConfig;
+  const hasPluginConfig =
+    pluginConfig != null &&
+    typeof pluginConfig === "object" &&
+    Object.keys(pluginConfig).length > 0;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const perSessionConfig = (api.config as Record<string, any>)?.plugins?.entries?.meshimize
     ?.config as Record<string, unknown> | undefined;
-  const rawConfig = api.pluginConfig ?? perSessionConfig ?? {};
+
+  let rawConfig: Record<string, unknown>;
+  if (hasPluginConfig) {
+    rawConfig = pluginConfig as Record<string, unknown>;
+  } else if (perSessionConfig && Object.keys(perSessionConfig).length > 0) {
+    rawConfig = perSessionConfig;
+  } else {
+    rawConfig = readConfigFromDisk();
+  }
 
   let config;
   try {
@@ -77,4 +96,29 @@ export function register(api: PluginAPI): void {
 
   // Register delegation tools (8 tools)
   registerDelegationTools(api, { api: client, delegationBuffer: delegationContentBuffer });
+}
+
+/**
+ * Read Meshimize plugin config from the OpenClaw config file on disk.
+ * This is the last-resort fallback when neither api.pluginConfig nor
+ * api.config.plugins.entries provides config (e.g., per-session calls
+ * where the gateway strips plugin config from community plugins).
+ *
+ * @returns The meshimize config object from ~/.openclaw/openclaw.json,
+ *          or {} if the file doesn't exist or can't be parsed.
+ */
+function readConfigFromDisk(): Record<string, unknown> {
+  try {
+    const configPath = join(homedir(), ".openclaw", "openclaw.json");
+    const raw = readFileSync(configPath, "utf-8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const meshimizeConfig = (parsed as any)?.plugins?.entries?.meshimize?.config;
+    if (meshimizeConfig && typeof meshimizeConfig === "object") {
+      return meshimizeConfig as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
 }
