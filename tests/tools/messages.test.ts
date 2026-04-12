@@ -502,7 +502,7 @@ describe("registerMessageTools", () => {
     }
   });
 
-  it("each execute wrapper catches errors and returns isError result", async () => {
+  it("each execute wrapper catches errors and returns error result with details", async () => {
     const pluginApi = createMockPluginAPI({ apiKey: "mshz_test123" });
     const deps = createDeps();
 
@@ -514,31 +514,31 @@ describe("registerMessageTools", () => {
 
     // Test get_messages error handling
     const getTool = pluginApi._registeredTools.find((t) => t.name === "meshimize_get_messages")!;
-    const getResult = await getTool.execute({ group_id: "g-1" });
-    expect(getResult.isError).toBe(true);
+    const getResult = await getTool.execute("test-id", { group_id: "g-1" });
+    expect((getResult as Record<string, unknown>).details).toEqual({ error: true });
     const getParsed = JSON.parse(getResult.content[0].text);
     expect(getParsed.error).toBe("Meshimize: test-error");
 
     // Test post_message error handling
     const postTool = pluginApi._registeredTools.find((t) => t.name === "meshimize_post_message")!;
-    const postResult = await postTool.execute({
+    const postResult = await postTool.execute("test-id", {
       group_id: "g-1",
       content: "hi",
       message_type: "post",
     });
-    expect(postResult.isError).toBe(true);
+    expect((postResult as Record<string, unknown>).details).toEqual({ error: true });
 
     // Test ask_question error handling (membership check fails)
     const askTool = pluginApi._registeredTools.find((t) => t.name === "meshimize_ask_question")!;
-    const askResult = await askTool.execute({ group_id: "g-1", question: "what?" });
-    expect(askResult.isError).toBe(true);
+    const askResult = await askTool.execute("test-id", { group_id: "g-1", question: "what?" });
+    expect((askResult as Record<string, unknown>).details).toEqual({ error: true });
 
     // Test get_pending_questions error handling
     const pendingTool = pluginApi._registeredTools.find(
       (t) => t.name === "meshimize_get_pending_questions",
     )!;
-    const pendingResult = await pendingTool.execute({ group_id: "g-1" });
-    expect(pendingResult.isError).toBe(true);
+    const pendingResult = await pendingTool.execute("test-id", { group_id: "g-1" });
+    expect((pendingResult as Record<string, unknown>).details).toEqual({ error: true });
   });
 
   it("get_messages execute returns success result with correct format", async () => {
@@ -549,9 +549,9 @@ describe("registerMessageTools", () => {
     registerMessageTools(pluginApi, deps);
 
     const tool = pluginApi._registeredTools.find((t) => t.name === "meshimize_get_messages")!;
-    const result = await tool.execute({ group_id: "g-1" });
+    const result = await tool.execute("test-id", { group_id: "g-1" });
 
-    expect(result.isError).toBeUndefined();
+    expect((result as Record<string, unknown>).details).toBeUndefined();
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe("text");
     const parsed = JSON.parse(result.content[0].text);

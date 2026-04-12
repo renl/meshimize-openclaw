@@ -8,14 +8,14 @@
 
 import { MeshimizeAPIError } from "./api/client.js";
 
-// Import ToolResult type for use in return types
-import type { ToolResult } from "openclaw/plugin-sdk/types";
+// Import AgentToolResult type for use in return types
+import type { AgentToolResult } from "openclaw/plugin-sdk/types";
 
 /**
  * Consolidated success result helper.
  * Previously duplicated in groups.ts, messages.ts, direct-messages.ts, delegations.ts.
  */
-export function successResult(data: unknown): ToolResult {
+export function successResult(data: unknown): AgentToolResult {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
   };
@@ -24,10 +24,10 @@ export function successResult(data: unknown): ToolResult {
 /**
  * Consolidated error result helper.
  */
-export function errorResult(message: string): ToolResult {
+export function errorResult(message: string): AgentToolResult {
   return {
     content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-    isError: true,
+    details: { error: true },
   };
 }
 

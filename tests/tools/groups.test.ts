@@ -117,7 +117,6 @@ function createMockWsService(): {
 } {
   return {
     id: "meshimize-ws",
-    name: "meshimize-ws",
     start: vi.fn(),
     stop: vi.fn(),
     subscribeToGroup: vi.fn(),
@@ -517,7 +516,7 @@ describe("registerGroupTools", () => {
     }
   });
 
-  it("each execute wrapper catches errors and returns isError result", async () => {
+  it("each execute wrapper catches errors and returns error result with details", async () => {
     const pluginApi = createMockPluginAPI({ apiKey: "mshz_test123" });
     const deps = createDeps();
 
@@ -536,27 +535,27 @@ describe("registerGroupTools", () => {
     const searchTool = pluginApi._registeredTools.find(
       (t) => t.name === "meshimize_search_groups",
     )!;
-    const searchResult = await searchTool.execute({});
-    expect(searchResult.isError).toBe(true);
+    const searchResult = await searchTool.execute("test-id", {});
+    expect((searchResult as Record<string, unknown>).details).toEqual({ error: true });
     const searchParsed = JSON.parse(searchResult.content[0].text);
     expect(searchParsed.error).toBe("Meshimize: test-error");
 
     // Test list_my_groups error handling
     const listTool = pluginApi._registeredTools.find((t) => t.name === "meshimize_list_my_groups")!;
-    const listResult = await listTool.execute({});
-    expect(listResult.isError).toBe(true);
+    const listResult = await listTool.execute("test-id", {});
+    expect((listResult as Record<string, unknown>).details).toEqual({ error: true });
 
     // Test leave_group error handling
     const leaveTool = pluginApi._registeredTools.find((t) => t.name === "meshimize_leave_group")!;
-    const leaveResult = await leaveTool.execute({ group_id: "g-1" });
-    expect(leaveResult.isError).toBe(true);
+    const leaveResult = await leaveTool.execute("test-id", { group_id: "g-1" });
+    expect((leaveResult as Record<string, unknown>).details).toEqual({ error: true });
 
     // Test list_pending_joins error handling
     const pendingTool = pluginApi._registeredTools.find(
       (t) => t.name === "meshimize_list_pending_joins",
     )!;
-    const pendingResult = await pendingTool.execute({});
-    expect(pendingResult.isError).toBe(true);
+    const pendingResult = await pendingTool.execute("test-id", {});
+    expect((pendingResult as Record<string, unknown>).details).toEqual({ error: true });
   });
 
   it("search_groups execute returns success result with correct format", async () => {
@@ -568,9 +567,9 @@ describe("registerGroupTools", () => {
     registerGroupTools(pluginApi, deps);
 
     const tool = pluginApi._registeredTools.find((t) => t.name === "meshimize_search_groups")!;
-    const result = await tool.execute({});
+    const result = await tool.execute("test-id", {});
 
-    expect(result.isError).toBeUndefined();
+    expect((result as Record<string, unknown>).details).toBeUndefined();
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe("text");
     const parsed = JSON.parse(result.content[0].text);
@@ -588,7 +587,6 @@ describe("plugin registration integration", () => {
     pluginEntry.register(api);
 
     expect(api._registeredServices).toHaveLength(1);
-    expect(api._registeredServices[0].name).toBe("meshimize-ws");
     expect(api._registeredServices[0].id).toBe("meshimize-ws");
     expect(api._registeredTools).toHaveLength(21);
   });

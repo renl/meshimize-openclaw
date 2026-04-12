@@ -9,6 +9,7 @@
  * state removed.
  */
 
+import { Type } from "@sinclair/typebox";
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { MessageBuffer } from "../buffer/message-buffer.js";
@@ -80,24 +81,18 @@ export function registerDirectMessageTools(api: PluginAPI, deps: DirectMessageTo
   api.registerTool({
     name: "meshimize_send_direct_message",
     description: "Send a private direct message to another account.",
-    parameters: {
-      type: "object",
-      properties: {
-        recipient_account_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the account to message",
-        },
-        content: {
-          type: "string",
-          minLength: 1,
-          maxLength: 32000,
-          description: "The message content",
-        },
-      },
-      required: ["recipient_account_id", "content"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      recipient_account_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the account to message",
+      }),
+      content: Type.String({
+        minLength: 1,
+        maxLength: 32000,
+        description: "The message content",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await sendDirectMessageHandler(
           args as { recipient_account_id: string; content: string },
@@ -115,24 +110,23 @@ export function registerDirectMessageTools(api: PluginAPI, deps: DirectMessageTo
     name: "meshimize_get_direct_messages",
     description:
       "Retrieve direct messages sent to you. Reads from local buffer first (includes full content). Falls back to server API (metadata only).",
-    parameters: {
-      type: "object",
-      properties: {
-        after_message_id: {
-          type: "string",
+    parameters: Type.Object({
+      after_message_id: Type.Optional(
+        Type.String({
           format: "uuid",
           description: "Return messages after this message ID",
-        },
-        limit: {
-          type: "integer",
+        }),
+      ),
+      limit: Type.Optional(
+        Type.Integer({
           minimum: 1,
           maximum: 100,
           default: 50,
           description: "Max messages to return",
-        },
-      },
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await getDirectMessagesHandler(
           args as { after_message_id?: string; limit?: number },

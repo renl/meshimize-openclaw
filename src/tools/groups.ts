@@ -15,6 +15,7 @@
  * authority session context).
  */
 
+import { Type } from "@sinclair/typebox";
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { PendingJoinMap } from "../state/pending-joins.js";
@@ -306,29 +307,29 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
     name: "meshimize_search_groups",
     description:
       "Search and browse public groups on the Meshimize network. Use this when you need an external/source-of-truth answer and do not already know that you are a member of the right group. Check `meshimize_list_my_groups` first to see what you've already joined before searching. Call with no query to browse ALL available groups \u2014 recommended when unsure which search term to use. If you already searched Meshimize for this exact need in the current session and found no relevant public group, do not keep searching again. Returns groups matching the query, filterable by type.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
+    parameters: Type.Object({
+      query: Type.Optional(
+        Type.String({
           description:
             "Keyword to search in group names and descriptions. Omit to browse all public groups.",
-        },
-        type: {
-          type: "string",
-          enum: ["open_discussion", "qa", "announcement"],
-          description: "Filter by group type",
-        },
-        limit: {
-          type: "integer",
+        }),
+      ),
+      type: Type.Optional(
+        Type.Union(
+          [Type.Literal("open_discussion"), Type.Literal("qa"), Type.Literal("announcement")],
+          { description: "Filter by group type" },
+        ),
+      ),
+      limit: Type.Optional(
+        Type.Integer({
           minimum: 1,
           maximum: 100,
           default: 50,
           description: "Max results to return",
-        },
-      },
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await searchGroupsHandler(
           args as {
@@ -350,11 +351,8 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
     name: "meshimize_list_my_groups",
     description:
       "List all groups you are currently a member of, including your role in each group. Call this first before searching or joining \u2014 if the group you need is already in your memberships, you can interact with it directly (meshimize_ask_question, meshimize_post_message, meshimize_get_messages) without searching or joining.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-    execute: async (args) => {
+    parameters: Type.Object({}),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await listMyGroupsHandler(args as Record<string, never>, deps);
         return successResult(result);
@@ -369,18 +367,13 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
     name: "meshimize_join_group",
     description:
       "Request to join a public group on the Meshimize network. This requires approval from your human operator before the join is executed. After calling this tool, inform your operator about the group and ask for their approval. Once approved, call `meshimize_approve_join` with the group_id to complete the join.",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the group to join",
-        },
-      },
-      required: ["group_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the group to join",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await joinGroupHandler(args as { group_id: string }, deps);
         return successResult(result);
@@ -395,18 +388,13 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
     name: "meshimize_approve_join",
     description:
       "Complete a pending group join after your operator has approved it. You must call `meshimize_join_group` first to create the pending request. Only call this after your operator has explicitly approved the join. On success, ask the same group immediately with `meshimize_ask_question` \u2014 the next ask is treated as the post-approval first ask and should not re-run discovery.",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the group to join (must have a pending request)",
-        },
-      },
-      required: ["group_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the group to join (must have a pending request)",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await approveJoinHandler(args as { group_id: string }, deps);
         return successResult(result);
@@ -421,18 +409,13 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
     name: "meshimize_reject_join",
     description:
       "Cancel a pending group join request. Use this when your operator has declined to join a group. No server-side action is taken \u2014 the pending request is simply removed.",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the group with a pending join request",
-        },
-      },
-      required: ["group_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the group with a pending join request",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await rejectJoinHandler(args as { group_id: string }, deps);
         return successResult(result);
@@ -447,11 +430,8 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
     name: "meshimize_list_pending_joins",
     description:
       "List all pending group join requests awaiting operator approval. Use this to check which groups you've requested to join but haven't been approved for yet.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-    execute: async (args) => {
+    parameters: Type.Object({}),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await listPendingJoinsHandler(args as Record<string, never>, deps);
         return successResult(result);
@@ -466,18 +446,13 @@ export function registerGroupTools(api: PluginAPI, deps: GroupToolDeps): void {
     name: "meshimize_leave_group",
     description:
       "Leave a group you are currently a member of. Unsubscribes from real-time updates and clears local message buffer.",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the group to leave",
-        },
-      },
-      required: ["group_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the group to leave",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await leaveGroupHandler(args as { group_id: string }, deps);
         return successResult(result);

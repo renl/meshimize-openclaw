@@ -46,9 +46,10 @@ describe("plugin", () => {
       expect(pluginEntry.id).toBe(manifest.id);
     });
 
-    it("includes configSchema matching openclaw.plugin.json", () => {
+    it("includes configSchema with safeParse and jsonSchema matching openclaw.plugin.json", () => {
       expect(pluginEntry.configSchema).toBeDefined();
-      expect(pluginEntry.configSchema).toEqual(manifest.configSchema);
+      expect(typeof pluginEntry.configSchema!.safeParse).toBe("function");
+      expect(pluginEntry.configSchema!.jsonSchema).toEqual(manifest.configSchema);
     });
   });
 
@@ -79,7 +80,6 @@ describe("plugin", () => {
       pluginEntry.register(api);
 
       expect(api._registeredServices).toHaveLength(1);
-      expect(api._registeredServices[0].name).toBe("meshimize-ws");
       expect(api._registeredServices[0].id).toBe("meshimize-ws");
       expect(typeof api._registeredServices[0].start).toBe("function");
       expect(typeof api._registeredServices[0].stop).toBe("function");

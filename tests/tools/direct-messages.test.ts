@@ -208,7 +208,7 @@ describe("registerDirectMessageTools", () => {
     }
   });
 
-  it("each execute wrapper catches errors and returns isError result", async () => {
+  it("each execute wrapper catches errors and returns error result with details", async () => {
     const pluginApi = createMockPluginAPI({ apiKey: "mshz_test123" });
     const deps = createDeps();
 
@@ -221,11 +221,11 @@ describe("registerDirectMessageTools", () => {
     const sendTool = pluginApi._registeredTools.find(
       (t) => t.name === "meshimize_send_direct_message",
     )!;
-    const sendResult = await sendTool.execute({
+    const sendResult = await sendTool.execute("test-id", {
       recipient_account_id: "acct-2",
       content: "hi",
     });
-    expect(sendResult.isError).toBe(true);
+    expect((sendResult as Record<string, unknown>).details).toEqual({ error: true });
     const sendParsed = JSON.parse(sendResult.content[0].text);
     expect(sendParsed.error).toBe("Meshimize: test-error");
 
@@ -233,8 +233,8 @@ describe("registerDirectMessageTools", () => {
     const getTool = pluginApi._registeredTools.find(
       (t) => t.name === "meshimize_get_direct_messages",
     )!;
-    const getResult = await getTool.execute({});
-    expect(getResult.isError).toBe(true);
+    const getResult = await getTool.execute("test-id", {});
+    expect((getResult as Record<string, unknown>).details).toEqual({ error: true });
   });
 
   it("send_direct_message execute returns success result with correct format", async () => {
@@ -248,9 +248,9 @@ describe("registerDirectMessageTools", () => {
     const tool = pluginApi._registeredTools.find(
       (t) => t.name === "meshimize_send_direct_message",
     )!;
-    const result = await tool.execute({ recipient_account_id: "acct-2", content: "Hi" });
+    const result = await tool.execute("test-id", { recipient_account_id: "acct-2", content: "Hi" });
 
-    expect(result.isError).toBeUndefined();
+    expect((result as Record<string, unknown>).details).toBeUndefined();
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe("text");
     const parsed = JSON.parse(result.content[0].text);

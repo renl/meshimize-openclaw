@@ -12,6 +12,7 @@
  * authority session context).
  */
 
+import { Type } from "@sinclair/typebox";
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { MessageBuffer } from "../buffer/message-buffer.js";
@@ -257,30 +258,27 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
     name: "meshimize_get_messages",
     description:
       "Retrieve recent messages from a group. Reads from local buffer first (includes full content). Falls back to server API which returns metadata only (no message content).",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the group",
-        },
-        after_message_id: {
-          type: "string",
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the group",
+      }),
+      after_message_id: Type.Optional(
+        Type.String({
           format: "uuid",
           description: "Return messages after this message ID (for pagination)",
-        },
-        limit: {
-          type: "integer",
+        }),
+      ),
+      limit: Type.Optional(
+        Type.Integer({
           minimum: 1,
           maximum: 100,
           default: 50,
           description: "Max messages to return",
-        },
-      },
-      required: ["group_id"],
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await getMessagesHandler(
           args as { group_id: string; after_message_id?: string; limit?: number },
@@ -298,34 +296,28 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
     name: "meshimize_post_message",
     description:
       "Send a message to a group. Use 'question' type for Q&A groups, 'answer' to reply to a question (requires parent_message_id), or 'post' for discussion. Check `meshimize_list_my_groups` first to confirm membership before posting.",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the group to post to",
-        },
-        content: {
-          type: "string",
-          minLength: 1,
-          maxLength: 32000,
-          description: "The message content",
-        },
-        message_type: {
-          type: "string",
-          enum: ["post", "question", "answer"],
-          description: "Type of message",
-        },
-        parent_message_id: {
-          type: "string",
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the group to post to",
+      }),
+      content: Type.String({
+        minLength: 1,
+        maxLength: 32000,
+        description: "The message content",
+      }),
+      message_type: Type.Union(
+        [Type.Literal("post"), Type.Literal("question"), Type.Literal("answer")],
+        { description: "Type of message" },
+      ),
+      parent_message_id: Type.Optional(
+        Type.String({
           format: "uuid",
           description: "Required for 'answer' type \u2014 the question being answered",
-        },
-      },
-      required: ["group_id", "content", "message_type"],
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await postMessageHandler(
           args as {
@@ -348,31 +340,26 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
     name: "meshimize_ask_question",
     description:
       "Ask a membership-resolved Q&A group directly, including the first ask immediately after operator approval. This tool verifies current membership before posting, waits for a live answer in the local buffer, and returns the answer on success. If no answer arrives in time, it returns recoverable timeout metadata so you can use `meshimize_get_messages` to retrieve a late answer without re-asking. If you're already a member, skip search/join and call this tool directly with the group_id.",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the Q&A group",
-        },
-        question: {
-          type: "string",
-          minLength: 1,
-          maxLength: 32000,
-          description: "The question to ask",
-        },
-        timeout_seconds: {
-          type: "integer",
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the Q&A group",
+      }),
+      question: Type.String({
+        minLength: 1,
+        maxLength: 32000,
+        description: "The question to ask",
+      }),
+      timeout_seconds: Type.Optional(
+        Type.Integer({
           minimum: 90,
           maximum: 300,
           default: 90,
           description: "How long to wait for an answer (seconds)",
-        },
-      },
-      required: ["group_id", "question"],
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await askQuestionHandler(
           args as { group_id: string; question: string; timeout_seconds?: number },
@@ -390,25 +377,24 @@ export function registerMessageTools(api: PluginAPI, deps: MessageToolDeps): voi
     name: "meshimize_get_pending_questions",
     description:
       "Retrieve unanswered questions from Q&A groups where you are an owner or responder. Reads from local buffer (includes content). Falls back to server API (metadata only).",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
+    parameters: Type.Object({
+      group_id: Type.Optional(
+        Type.String({
           format: "uuid",
           description:
             "Filter to a specific group. If omitted, returns questions from all your Q&A groups.",
-        },
-        limit: {
-          type: "integer",
+        }),
+      ),
+      limit: Type.Optional(
+        Type.Integer({
           minimum: 1,
           maximum: 100,
           default: 10,
           description: "Max questions to return",
-        },
-      },
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await getPendingQuestionsHandler(
           args as { group_id?: string; limit?: number },

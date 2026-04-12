@@ -15,6 +15,7 @@
  * state removed. Uses enrichWithBuffer pattern for content fallback.
  */
 
+import { Type } from "@sinclair/typebox";
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { Delegation, DelegationState, DelegationRoleFilter } from "../types/delegations.js";
@@ -222,35 +223,31 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_create_delegation",
     description:
       "Create a new delegation in a group. The sender is automatically set to the authenticated account. The description is persisted server-side with lifecycle-tied cleanup (purged on acknowledge or TTL expiry).",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the group",
-        },
-        description: {
-          type: "string",
-          minLength: 1,
-          maxLength: 32000,
-          description: "Description of the delegated task",
-        },
-        target_account_id: {
-          type: "string",
+    parameters: Type.Object({
+      group_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the group",
+      }),
+      description: Type.String({
+        minLength: 1,
+        maxLength: 32000,
+        description: "Description of the delegated task",
+      }),
+      target_account_id: Type.Optional(
+        Type.String({
           format: "uuid",
           description: "Optional UUID of the target account to assign the delegation to",
-        },
-        ttl_seconds: {
-          type: "integer",
+        }),
+      ),
+      ttl_seconds: Type.Optional(
+        Type.Integer({
           minimum: 300,
           maximum: 604800,
           description: "Time-to-live in seconds (300\u2013604800). Defaults to server setting.",
-        },
-      },
-      required: ["group_id", "description"],
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await createDelegationHandler(
           args as {
@@ -273,39 +270,47 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_list_delegations",
     description:
       "List delegations with optional filters. Returns delegations from the server with content included. Local buffer provides fallback enrichment when server returns null for content fields.",
-    parameters: {
-      type: "object",
-      properties: {
-        group_id: {
-          type: "string",
+    parameters: Type.Object({
+      group_id: Type.Optional(
+        Type.String({
           format: "uuid",
           description: "Filter by group UUID",
-        },
-        state: {
-          type: "string",
-          enum: ["pending", "accepted", "completed", "acknowledged", "cancelled", "expired"],
-          description: "Filter by delegation state",
-        },
-        role: {
-          type: "string",
-          enum: ["sender", "assignee", "available"],
+        }),
+      ),
+      state: Type.Optional(
+        Type.Union(
+          [
+            Type.Literal("pending"),
+            Type.Literal("accepted"),
+            Type.Literal("completed"),
+            Type.Literal("acknowledged"),
+            Type.Literal("cancelled"),
+            Type.Literal("expired"),
+          ],
+          { description: "Filter by delegation state" },
+        ),
+      ),
+      role: Type.Optional(
+        Type.Union([Type.Literal("sender"), Type.Literal("assignee"), Type.Literal("available")], {
           description: "Filter by role relative to the authenticated account",
-        },
-        limit: {
-          type: "integer",
+        }),
+      ),
+      limit: Type.Optional(
+        Type.Integer({
           minimum: 1,
           maximum: 100,
           default: 50,
           description: "Max delegations to return",
-        },
-        after: {
-          type: "string",
+        }),
+      ),
+      after: Type.Optional(
+        Type.String({
           format: "uuid",
           description: "Cursor for pagination",
-        },
-      },
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await listDelegationsHandler(
           args as {
@@ -329,18 +334,13 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_get_delegation",
     description:
       "Get a single delegation by ID. Returns delegation from server with content included. Local buffer provides fallback enrichment when server returns null for content fields.",
-    parameters: {
-      type: "object",
-      properties: {
-        delegation_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the delegation",
-        },
-      },
-      required: ["delegation_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      delegation_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the delegation",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await getDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
@@ -355,18 +355,13 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_accept_delegation",
     description:
       "Accept a pending delegation. Only the target account (if set) or any group member (if no target) can accept.",
-    parameters: {
-      type: "object",
-      properties: {
-        delegation_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the delegation to accept",
-        },
-      },
-      required: ["delegation_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      delegation_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the delegation to accept",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await acceptDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
@@ -381,24 +376,18 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_complete_delegation",
     description:
       "Complete an accepted delegation with a result. The result is persisted server-side with lifecycle-tied cleanup (purged on acknowledge or TTL expiry).",
-    parameters: {
-      type: "object",
-      properties: {
-        delegation_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the delegation to complete",
-        },
-        result: {
-          type: "string",
-          minLength: 1,
-          maxLength: 32000,
-          description: "The result of the delegation",
-        },
-      },
-      required: ["delegation_id", "result"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      delegation_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the delegation to complete",
+      }),
+      result: Type.String({
+        minLength: 1,
+        maxLength: 32000,
+        description: "The result of the delegation",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await completeDelegationHandler(
           args as { delegation_id: string; result: string },
@@ -416,18 +405,13 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_cancel_delegation",
     description:
       "Cancel a delegation. Only the sender can cancel a pending or accepted delegation.",
-    parameters: {
-      type: "object",
-      properties: {
-        delegation_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the delegation to cancel",
-        },
-      },
-      required: ["delegation_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      delegation_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the delegation to cancel",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await cancelDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
@@ -442,18 +426,13 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_acknowledge_delegation",
     description:
       "Acknowledge a completed delegation. Only the sender can call. Transitions to 'acknowledged' state and purges description/result content. Clears the local content buffer for this delegation.",
-    parameters: {
-      type: "object",
-      properties: {
-        delegation_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the delegation to acknowledge",
-        },
-      },
-      required: ["delegation_id"],
-    },
-    execute: async (args) => {
+    parameters: Type.Object({
+      delegation_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the delegation to acknowledge",
+      }),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await acknowledgeDelegationHandler(args as { delegation_id: string }, deps);
         return successResult(result);
@@ -468,25 +447,21 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
     name: "meshimize_extend_delegation",
     description:
       "Extend the TTL of a delegation. Only the sender can call. Works on pending, accepted, or completed delegations. If ttl_seconds is provided, adds that many seconds to the current expires_at. If omitted, resets expires_at to now + original_ttl_seconds.",
-    parameters: {
-      type: "object",
-      properties: {
-        delegation_id: {
-          type: "string",
-          format: "uuid",
-          description: "The UUID of the delegation",
-        },
-        ttl_seconds: {
-          type: "integer",
+    parameters: Type.Object({
+      delegation_id: Type.String({
+        format: "uuid",
+        description: "The UUID of the delegation",
+      }),
+      ttl_seconds: Type.Optional(
+        Type.Integer({
           minimum: 300,
           maximum: 604800,
           description:
             "Seconds to add to current expires_at. If omitted, resets to now + original_ttl_seconds.",
-        },
-      },
-      required: ["delegation_id"],
-    },
-    execute: async (args) => {
+        }),
+      ),
+    }),
+    execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await extendDelegationHandler(
           args as { delegation_id: string; ttl_seconds?: number },
