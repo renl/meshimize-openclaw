@@ -118,7 +118,17 @@ function readConfigFromDisk(): Record<string, unknown> {
       return meshimizeConfig as Record<string, unknown>;
     }
     return {};
-  } catch {
+  } catch (err: unknown) {
+    // ENOENT is expected when the file doesn't exist — fall through silently.
+    // Other errors (EACCES, invalid JSON, etc.) indicate a broken config file
+    // and deserve a warning so the user can diagnose the real root cause
+    // instead of seeing a misleading "API key not configured" message.
+    const isEnoent =
+      err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT";
+    if (!isEnoent) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[meshimize] Failed to read config from ~/.openclaw/openclaw.json: ${msg}`);
+    }
     return {};
   }
 }

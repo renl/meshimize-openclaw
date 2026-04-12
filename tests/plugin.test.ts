@@ -216,7 +216,7 @@ describe("plugin", () => {
       expect(api._registeredTools).toHaveLength(21);
     });
 
-    it("logs warning when file-based config file does not exist", () => {
+    it("falls through silently when file-based config file does not exist (ENOENT)", () => {
       vi.mocked(readFileSync).mockImplementation(((
         pathArg: string | number | URL,
         ...rest: unknown[]
@@ -234,8 +234,69 @@ describe("plugin", () => {
 
       pluginEntry.register(api);
 
-      // File fallback returned {} → loadConfig throws ConfigValidationError → warns
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[meshimize]"));
+      // ENOENT is silently ignored — only the loadConfig "API key not configured" warning fires
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("API key not configured"));
+      // No file-read warning for ENOENT
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Failed to read config from"),
+      );
+      expect(api._registeredServices).toHaveLength(0);
+      expect(api._registeredTools).toHaveLength(0);
+
+      warnSpy.mockRestore();
+    });
+
+    it("warns when file-based config exists but is unreadable (non-ENOENT error)", () => {
+      vi.mocked(readFileSync).mockImplementation(((
+        pathArg: string | number | URL,
+        ...rest: unknown[]
+      ) => {
+        if (typeof pathArg === "string" && pathArg.includes(".openclaw")) {
+          const err = new Error("EACCES: permission denied") as NodeJS.ErrnoException;
+          err.code = "EACCES";
+          throw err;
+        }
+        return realReadFileSync(pathArg, ...rest);
+      }) as typeof readFileSync);
+
+      const api = createMockPluginAPI({});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      pluginEntry.register(api);
+
+      // Non-ENOENT errors produce a diagnostic warning about the file read failure
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to read config from ~/.openclaw/openclaw.json"),
+      );
+      // Plus the loadConfig "API key not configured" warning
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("API key not configured"));
+      expect(api._registeredServices).toHaveLength(0);
+      expect(api._registeredTools).toHaveLength(0);
+
+      warnSpy.mockRestore();
+    });
+
+    it("warns when file-based config contains invalid JSON", () => {
+      vi.mocked(readFileSync).mockImplementation(((
+        pathArg: string | number | URL,
+        ...rest: unknown[]
+      ) => {
+        if (typeof pathArg === "string" && pathArg.includes(".openclaw")) {
+          return "{ not valid json !!!";
+        }
+        return realReadFileSync(pathArg, ...rest);
+      }) as typeof readFileSync);
+
+      const api = createMockPluginAPI({});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      pluginEntry.register(api);
+
+      // Invalid JSON produces a diagnostic warning
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to read config from ~/.openclaw/openclaw.json"),
+      );
       expect(api._registeredServices).toHaveLength(0);
       expect(api._registeredTools).toHaveLength(0);
 
