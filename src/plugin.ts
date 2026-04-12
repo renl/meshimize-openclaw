@@ -32,8 +32,8 @@ export function register(api: PluginAPI): void {
   // Resolve config with full fallback chain:
   // 1. api.pluginConfig (gateway mode) — skip if empty object
   // 2. api.config.plugins.entries.meshimize.config (per-session with full config tree)
-  // 3. Read ~/.openclaw/openclaw.json from disk (always available on OpenClaw installs)
-  // 4. {} — will fail validation in loadConfig (env vars may still save it)
+  // 3. Best-effort read of ~/.openclaw/openclaw.json from disk, if available
+  // 4. {} — final fallback; loadConfig will fail validation unless env vars provide values
   const pluginConfig = api.pluginConfig;
   const hasPluginConfig =
     pluginConfig != null &&
