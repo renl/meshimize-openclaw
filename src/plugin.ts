@@ -104,17 +104,20 @@ export function register(api: PluginAPI): void {
  * api.config.plugins.entries provides config (e.g., per-session calls
  * where the gateway strips plugin config from community plugins).
  *
- * @returns The meshimize config object from ~/.openclaw/openclaw.json,
- *          or {} if the file doesn't exist or can't be parsed.
+ * Reads from `<homedir>/.openclaw/openclaw.json` and extracts
+ * `plugins.entries.meshimize.config`.
+ *
+ * @returns The meshimize config object, or {} if the file doesn't exist
+ *          or can't be parsed.
  */
 function readConfigFromDisk(): Record<string, unknown> {
+  const configPath = join(homedir(), ".openclaw", "openclaw.json");
   try {
-    const configPath = join(homedir(), ".openclaw", "openclaw.json");
     const raw = readFileSync(configPath, "utf-8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meshimizeConfig = (parsed as any)?.plugins?.entries?.meshimize?.config;
-    if (meshimizeConfig && typeof meshimizeConfig === "object") {
+    if (meshimizeConfig && typeof meshimizeConfig === "object" && !Array.isArray(meshimizeConfig)) {
       return meshimizeConfig as Record<string, unknown>;
     }
     return {};
@@ -127,7 +130,7 @@ function readConfigFromDisk(): Record<string, unknown> {
       err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT";
     if (!isEnoent) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[meshimize] Failed to read config from ~/.openclaw/openclaw.json: ${msg}`);
+      console.warn(`[meshimize] Failed to read config from ${configPath}: ${msg}`);
     }
     return {};
   }

@@ -3,18 +3,30 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // vi.mock is hoisted above all imports — intercepts readFileSync in both
-// this test file and src/plugin.ts. Defaults to real implementation so
-// manifest reads and non-file-fallback tests work unchanged.
+// this test file and src/plugin.ts. Default mock throws ENOENT for
+// .openclaw config paths (hermetic — prevents real ~/.openclaw/openclaw.json
+// from leaking into tests) while delegating to the real implementation for
+// all other paths (manifest reads, fixtures, etc.).
 // Use var (not let/const) to avoid TDZ issues with vi.mock hoisting.
 // eslint-disable-next-line no-var
 var realReadFileSync: typeof import("node:fs").readFileSync;
+
+/** Default mock: ENOENT for .openclaw paths, real fs for everything else. */
+function hermeticReadFileSync(pathArg: string | number | URL, ...rest: unknown[]): unknown {
+  if (typeof pathArg === "string" && pathArg.includes(".openclaw")) {
+    const err = new Error("ENOENT: no such file or directory") as NodeJS.ErrnoException;
+    err.code = "ENOENT";
+    throw err;
+  }
+  return realReadFileSync(pathArg, ...rest);
+}
 
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
   realReadFileSync = actual.readFileSync;
   return {
     ...actual,
-    readFileSync: vi.fn(actual.readFileSync),
+    readFileSync: vi.fn(hermeticReadFileSync),
   };
 });
 
@@ -48,8 +60,8 @@ describe("plugin", () => {
         delete process.env[key];
       }
     }
-    // Reset readFileSync mock back to real implementation after each test
-    vi.mocked(readFileSync).mockImplementation(realReadFileSync);
+    // Reset readFileSync mock to hermetic default after each test
+    vi.mocked(readFileSync).mockImplementation(hermeticReadFileSync as typeof readFileSync);
   });
 
   describe("pluginEntry structure", () => {
@@ -217,18 +229,7 @@ describe("plugin", () => {
     });
 
     it("falls through silently when file-based config file does not exist (ENOENT)", () => {
-      vi.mocked(readFileSync).mockImplementation(((
-        pathArg: string | number | URL,
-        ...rest: unknown[]
-      ) => {
-        if (typeof pathArg === "string" && pathArg.includes(".openclaw")) {
-          const err = new Error("ENOENT: no such file or directory") as NodeJS.ErrnoException;
-          err.code = "ENOENT";
-          throw err;
-        }
-        return realReadFileSync(pathArg, ...rest);
-      }) as typeof readFileSync);
-
+      // Default mock already throws ENOENT for .openclaw paths — no override needed
       const api = createMockPluginAPI({});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -265,10 +266,8 @@ describe("plugin", () => {
 
       pluginEntry.register(api);
 
-      // Non-ENOENT errors produce a diagnostic warning about the file read failure
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to read config from ~/.openclaw/openclaw.json"),
-      );
+      // Non-ENOENT errors produce a diagnostic warning including the error detail
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("EACCES: permission denied"));
       // Plus the loadConfig "API key not configured" warning
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("API key not configured"));
       expect(api._registeredServices).toHaveLength(0);
@@ -294,9 +293,7 @@ describe("plugin", () => {
       pluginEntry.register(api);
 
       // Invalid JSON produces a diagnostic warning
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to read config from ~/.openclaw/openclaw.json"),
-      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to read config from"));
       expect(api._registeredServices).toHaveLength(0);
       expect(api._registeredTools).toHaveLength(0);
 
