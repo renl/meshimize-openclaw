@@ -385,6 +385,45 @@ describe("plugin", () => {
       expect(stateAfterReRegister.wsService).not.toBe(stateBefore.wsService);
     });
 
+    it("warns on config drift when re-registering with different credentials", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // First registration
+      const api1 = createMockPluginAPI({ apiKey: "mshz_original" });
+      pluginEntry.register(api1);
+      expect(api1._registeredServices).toHaveLength(1);
+
+      // Second registration with a different apiKey
+      const api2 = createMockPluginAPI({ apiKey: "mshz_different" });
+      pluginEntry.register(api2);
+
+      // Should warn about config drift
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Config drift detected"));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("apiKey"));
+
+      warnSpy.mockRestore();
+    });
+
+    it("does not warn when re-registering with the same config", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // First registration
+      const api1 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api1);
+
+      // Second registration with identical config
+      const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api2);
+
+      // No drift warning — only suppress the "registration skipped" warnings if any
+      const driftCalls = warnSpy.mock.calls.filter(
+        (args) => typeof args[0] === "string" && args[0].includes("Config drift"),
+      );
+      expect(driftCalls).toHaveLength(0);
+
+      warnSpy.mockRestore();
+    });
+
     it("does not create singletons when config validation fails", () => {
       // Attempt registration with bad config
       const api1 = createMockPluginAPI({ apiKey: "invalid_key" });

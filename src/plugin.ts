@@ -16,7 +16,7 @@ import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { loadConfig, ConfigValidationError } from "./config.js";
+import { loadConfig, ConfigValidationError, type Config } from "./config.js";
 import { MeshimizeAPI } from "./api/client.js";
 import { MessageBuffer } from "./buffer/message-buffer.js";
 import { DelegationContentBuffer } from "./buffer/delegation-content-buffer.js";
@@ -34,6 +34,8 @@ let sharedMessageBuffer: MessageBuffer | null = null;
 let sharedDelegationBuffer: DelegationContentBuffer | null = null;
 let sharedPendingJoinMap: ReturnType<typeof createPendingJoinMap> | null = null;
 let wsServiceInstance: WsService | null = null;
+/** Config snapshot from the first successful register() — used to warn on drift. */
+let singletonConfig: Config | null = null;
 
 /**
  * @internal — test use only. Returns references to current singletons
@@ -77,6 +79,7 @@ export function resetSharedState(): void {
   sharedDelegationBuffer = null;
   sharedPendingJoinMap = null;
   wsServiceInstance = null;
+  singletonConfig = null;
 }
 
 /**
@@ -129,6 +132,24 @@ export function register(api: PluginAPI): void {
   // Create the REST client (stateless — safe to recreate per session)
   const client = new MeshimizeAPI(config);
 
+  // Warn if a subsequent register() call uses a different config than the
+  // singletons were initialised with.  The WS service keeps using the first
+  // config's credentials/URLs, so a mismatch means tools and WS could talk
+  // to different servers or authenticate with different keys.
+  if (singletonConfig) {
+    const drifted: string[] = [];
+    if (config.apiKey !== singletonConfig.apiKey) drifted.push("apiKey");
+    if (config.baseUrl !== singletonConfig.baseUrl) drifted.push("baseUrl");
+    if (config.wsUrl !== singletonConfig.wsUrl) drifted.push("wsUrl");
+    if (drifted.length > 0) {
+      console.warn(
+        `[meshimize] Config drift detected on re-registration: ${drifted.join(", ")} ` +
+          `differ from the initial config used by the WS service. Tools will use the new ` +
+          `REST client, but the WS connection retains the original credentials.`,
+      );
+    }
+  }
+
   // Lazily initialise shared singletons on first successful registration
   if (!sharedMessageBuffer) {
     sharedMessageBuffer = new MessageBuffer();
@@ -150,6 +171,7 @@ export function register(api: PluginAPI): void {
       delegationContentBuffer: sharedDelegationBuffer,
     });
     api.registerService(wsServiceInstance);
+    singletonConfig = config;
   }
 
   // Register group tools (7 tools) — every call
