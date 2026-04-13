@@ -32,7 +32,7 @@ vi.mock("node:fs", async (importOriginal) => {
 
 import { readFileSync } from "node:fs";
 import pluginEntry from "../src/index.js";
-import { resetSharedState } from "../src/plugin.js";
+import { resetSharedState, getSharedState } from "../src/plugin.js";
 import { createMockPluginAPI } from "./__mocks__/openclaw-plugin-sdk/api.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -324,27 +324,28 @@ describe("plugin", () => {
       expect(api2._registeredTools).toHaveLength(21);
     });
 
-    it("reuses the same buffer singletons across multiple register() calls", () => {
+    it("reuses the same singleton instances across multiple register() calls", () => {
       // First registration
       const api1 = createMockPluginAPI({ apiKey: "mshz_test123" });
       pluginEntry.register(api1);
 
-      // Extract the messageBuffer reference from a tool's closure by inspecting
-      // the registered tool. We verify singleton identity by checking that tools
-      // from both registrations reference the same underlying tool name set
-      // (identity proof: if buffers were different, tools would be independent).
-      const toolNames1 = api1._registeredTools.map((t) => t.name);
+      // Capture singleton references after first registration
+      const state1 = getSharedState();
+      expect(state1.messageBuffer).not.toBeNull();
+      expect(state1.delegationBuffer).not.toBeNull();
+      expect(state1.pendingJoinMap).not.toBeNull();
+      expect(state1.wsService).not.toBeNull();
 
       // Second registration
       const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
       pluginEntry.register(api2);
 
-      const toolNames2 = api2._registeredTools.map((t) => t.name);
-
-      // Both should have the exact same 21 tool names — confirms consistent registration
-      expect(toolNames1).toHaveLength(21);
-      expect(toolNames2).toHaveLength(21);
-      expect(toolNames1).toEqual(toolNames2);
+      // Verify exact same object references — proves singleton identity
+      const state2 = getSharedState();
+      expect(state2.messageBuffer).toBe(state1.messageBuffer);
+      expect(state2.delegationBuffer).toBe(state1.delegationBuffer);
+      expect(state2.pendingJoinMap).toBe(state1.pendingJoinMap);
+      expect(state2.wsService).toBe(state1.wsService);
     });
 
     it("creates fresh singletons after resetSharedState()", () => {
@@ -354,8 +355,18 @@ describe("plugin", () => {
       expect(api1._registeredServices).toHaveLength(1);
       expect(api1._registeredTools).toHaveLength(21);
 
+      const stateBefore = getSharedState();
+      expect(stateBefore.messageBuffer).not.toBeNull();
+
       // Reset singletons
       resetSharedState();
+
+      // All references should be cleared
+      const stateAfterReset = getSharedState();
+      expect(stateAfterReset.messageBuffer).toBeNull();
+      expect(stateAfterReset.delegationBuffer).toBeNull();
+      expect(stateAfterReset.pendingJoinMap).toBeNull();
+      expect(stateAfterReset.wsService).toBeNull();
 
       // Second registration after reset — should create fresh instances
       const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
@@ -365,6 +376,13 @@ describe("plugin", () => {
       expect(api2._registeredServices).toHaveLength(1);
       expect(api2._registeredServices[0].id).toBe("meshimize-ws");
       expect(api2._registeredTools).toHaveLength(21);
+
+      // New singletons are different objects from the originals
+      const stateAfterReRegister = getSharedState();
+      expect(stateAfterReRegister.messageBuffer).not.toBe(stateBefore.messageBuffer);
+      expect(stateAfterReRegister.delegationBuffer).not.toBe(stateBefore.delegationBuffer);
+      expect(stateAfterReRegister.pendingJoinMap).not.toBe(stateBefore.pendingJoinMap);
+      expect(stateAfterReRegister.wsService).not.toBe(stateBefore.wsService);
     });
 
     it("does not create singletons when config validation fails", () => {

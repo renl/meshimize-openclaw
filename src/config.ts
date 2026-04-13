@@ -128,8 +128,8 @@ function validateWsUrl(raw: string): string {
     return url.toString().replace(/\/$/, "");
   }
 
-  // User provided a custom path — return as-is
-  return raw;
+  // User provided a custom path — return the normalized URL for consistent canonicalization.
+  return url.toString().replace(/\/$/, "");
 }
 
 /** Derive wsUrl from baseUrl per architecture §6.4. */

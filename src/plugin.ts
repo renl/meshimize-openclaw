@@ -36,9 +36,43 @@ let sharedPendingJoinMap: ReturnType<typeof createPendingJoinMap> | null = null;
 let wsServiceInstance: WsService | null = null;
 
 /**
- * @internal — test use only. Resets module-level singletons.
+ * @internal — test use only. Returns references to current singletons
+ * for identity assertions.
+ */
+export function getSharedState(): {
+  messageBuffer: MessageBuffer | null;
+  delegationBuffer: DelegationContentBuffer | null;
+  pendingJoinMap: ReturnType<typeof createPendingJoinMap> | null;
+  wsService: WsService | null;
+} {
+  return {
+    messageBuffer: sharedMessageBuffer,
+    delegationBuffer: sharedDelegationBuffer,
+    pendingJoinMap: sharedPendingJoinMap,
+    wsService: wsServiceInstance,
+  };
+}
+
+/**
+ * @internal — test use only. Tears down and resets module-level singletons.
+ * Cleans up owned resources (WS service socket/signal handlers, PendingJoinMap
+ * prune interval) before clearing references to avoid leaks.
  */
 export function resetSharedState(): void {
+  // stop() ignores its context arg (ws-manager.ts uses `_ctx?`); provide
+  // a minimal stub that satisfies the OpenClawPluginServiceContext type.
+  const noopCtx = {
+    config: {},
+    stateDir: "",
+    logger: {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      debug: () => {},
+    },
+  };
+  wsServiceInstance?.stop?.(noopCtx);
+  sharedPendingJoinMap?.dispose();
   sharedMessageBuffer = null;
   sharedDelegationBuffer = null;
   sharedPendingJoinMap = null;
