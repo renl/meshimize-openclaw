@@ -120,10 +120,11 @@ function validateWsUrl(raw: string): string {
     );
   }
 
-  // If the URL has no meaningful path (just "/" or empty), auto-append the canonical WS path.
+  // If the URL points at the root path "/", auto-append the canonical WS path.
   // This prevents users from accidentally pointing the WS client at the root, which causes
   // a rapid reconnect loop since the server doesn't serve websockets there.
-  if (url.pathname === "/" || url.pathname === "") {
+  // (WHATWG URL always normalizes pathname to at least "/" for ws/wss schemes.)
+  if (url.pathname === "/") {
     url.pathname = WS_PATH;
     return url.toString().replace(/\/$/, "");
   }
