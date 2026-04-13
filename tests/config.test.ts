@@ -144,4 +144,46 @@ describe("loadConfig", () => {
     expect(config.baseUrl).toBe("https://api.meshimize.com");
     // afterEach will restore the original env state
   });
+
+  describe("wsUrl auto-append", () => {
+    it("auto-appends WS path when wsUrl has no path", () => {
+      const config = loadConfig({
+        apiKey: "mshz_test123",
+        wsUrl: "wss://api.meshimize.com",
+      });
+      expect(config.wsUrl).toBe("wss://api.meshimize.com/api/v1/ws/websocket");
+    });
+
+    it("auto-appends WS path when wsUrl has root path only", () => {
+      const config = loadConfig({
+        apiKey: "mshz_test123",
+        wsUrl: "wss://api.meshimize.com/",
+      });
+      expect(config.wsUrl).toBe("wss://api.meshimize.com/api/v1/ws/websocket");
+    });
+
+    it("auto-appends WS path for ws:// scheme", () => {
+      const config = loadConfig({
+        apiKey: "mshz_test123",
+        wsUrl: "ws://localhost:4000",
+      });
+      expect(config.wsUrl).toBe("ws://localhost:4000/api/v1/ws/websocket");
+    });
+
+    it("preserves explicit custom path without appending", () => {
+      const config = loadConfig({
+        apiKey: "mshz_test123",
+        wsUrl: "wss://custom.example.com/ws",
+      });
+      expect(config.wsUrl).toBe("wss://custom.example.com/ws");
+    });
+
+    it("preserves full canonical WS path when already provided", () => {
+      const config = loadConfig({
+        apiKey: "mshz_test123",
+        wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+      });
+      expect(config.wsUrl).toBe("wss://api.meshimize.com/api/v1/ws/websocket");
+    });
+  });
 });

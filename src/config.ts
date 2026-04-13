@@ -97,7 +97,13 @@ function validateBaseUrl(raw: string): string {
   return url.origin;
 }
 
-/** Validate wsUrl uses ws:// or wss:// scheme. */
+/** Canonical WebSocket path for the Meshimize server. */
+const WS_PATH = "/api/v1/ws/websocket";
+
+/**
+ * Validate wsUrl uses ws:// or wss:// scheme.
+ * Auto-appends WS_PATH when the user provides a bare origin.
+ */
 function validateWsUrl(raw: string): string {
   let url: URL;
   try {
@@ -114,7 +120,15 @@ function validateWsUrl(raw: string): string {
     );
   }
 
-  // Return as-is (includes path like /api/v1/ws/websocket)
+  // If the URL has no meaningful path (just "/" or empty), auto-append the canonical WS path.
+  // This prevents users from accidentally pointing the WS client at the root, which causes
+  // a rapid reconnect loop since the server doesn't serve websockets there.
+  if (url.pathname === "/" || url.pathname === "") {
+    url.pathname = WS_PATH;
+    return url.toString().replace(/\/$/, "");
+  }
+
+  // User provided a custom path — return as-is
   return raw;
 }
 
@@ -122,6 +136,6 @@ function validateWsUrl(raw: string): string {
 function deriveWsUrl(baseUrl: string): string {
   const url = new URL(baseUrl);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = "/api/v1/ws/websocket";
+  url.pathname = WS_PATH;
   return url.toString().replace(/\/$/, "");
 }
