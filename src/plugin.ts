@@ -142,9 +142,10 @@ export function register(api: PluginAPI): void {
     if (config.baseUrl !== singletonConfig.baseUrl) drifted.push("baseUrl");
     if (config.wsUrl !== singletonConfig.wsUrl) drifted.push("wsUrl");
     if (drifted.length > 0) {
+      const verb = drifted.length === 1 ? "differs" : "differ";
       console.warn(
         `[meshimize] Config drift detected on re-registration: ${drifted.join(", ")} ` +
-          `differ from the initial config used by the WS service. Tools will use the new ` +
+          `${verb} from the initial config used by the WS service. Tools will use the new ` +
           `REST client, but the WS connection retains the original credentials.`,
       );
     }
