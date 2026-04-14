@@ -4,29 +4,94 @@
  * Reads config from the OpenClaw Plugin API, validates the API key,
  * creates the Meshimize REST client, instantiates buffers, creates the
  * background WS service, and registers it with the Gateway.
+ *
+ * Shared state (buffers, pending-join map, WS service) is hoisted to module
+ * level so that multiple `register()` calls — as the OpenClaw Gateway does
+ * (once for the gateway service, again per agent session) — share the same
+ * instances. This ensures WS-received messages are visible to tools across
+ * all sessions.
  */
 
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { loadConfig, ConfigValidationError } from "./config.js";
+import { loadConfig, ConfigValidationError, type Config } from "./config.js";
 import { MeshimizeAPI } from "./api/client.js";
 import { MessageBuffer } from "./buffer/message-buffer.js";
 import { DelegationContentBuffer } from "./buffer/delegation-content-buffer.js";
-import { createWsService } from "./services/ws-manager.js";
+import { createWsService, type WsService } from "./services/ws-manager.js";
 import { createPendingJoinMap, PENDING_JOIN_DEFAULTS } from "./state/pending-joins.js";
 import { registerGroupTools } from "./tools/groups.js";
 import { registerMessageTools } from "./tools/messages.js";
 import { registerDirectMessageTools } from "./tools/direct-messages.js";
 import { registerDelegationTools } from "./tools/delegations.js";
 
+// ── Module-level singletons ──────────────────────────────────────────────
+// Survive across multiple register() calls so the WS service and every
+// agent-session tool read/write the same buffer instances.
+let sharedMessageBuffer: MessageBuffer | null = null;
+let sharedDelegationBuffer: DelegationContentBuffer | null = null;
+let sharedPendingJoinMap: ReturnType<typeof createPendingJoinMap> | null = null;
+let wsServiceInstance: WsService | null = null;
+/** Config snapshot from the first successful register() — used to warn on drift. */
+let singletonConfig: Config | null = null;
+
+/**
+ * @internal — test use only. Returns references to current singletons
+ * for identity assertions.
+ */
+export function getSharedState(): {
+  messageBuffer: MessageBuffer | null;
+  delegationBuffer: DelegationContentBuffer | null;
+  pendingJoinMap: ReturnType<typeof createPendingJoinMap> | null;
+  wsService: WsService | null;
+} {
+  return {
+    messageBuffer: sharedMessageBuffer,
+    delegationBuffer: sharedDelegationBuffer,
+    pendingJoinMap: sharedPendingJoinMap,
+    wsService: wsServiceInstance,
+  };
+}
+
+/**
+ * @internal — test use only. Tears down and resets module-level singletons.
+ * Cleans up owned resources (WS service socket/signal handlers, PendingJoinMap
+ * prune interval) before clearing references to avoid leaks.
+ */
+export function resetSharedState(): void {
+  // stop() ignores its context arg (ws-manager.ts uses `_ctx?`); provide
+  // a minimal stub that satisfies the OpenClawPluginServiceContext type.
+  const noopCtx = {
+    config: {},
+    stateDir: "",
+    logger: {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      debug: () => {},
+    },
+  };
+  wsServiceInstance?.stop?.(noopCtx);
+  sharedPendingJoinMap?.dispose();
+  sharedMessageBuffer = null;
+  sharedDelegationBuffer = null;
+  sharedPendingJoinMap = null;
+  wsServiceInstance = null;
+  singletonConfig = null;
+}
+
 /**
  * Register the Meshimize plugin with the OpenClaw Gateway.
  *
- * Creates deps (REST client, buffers), creates and registers the background
- * WebSocket service. The Gateway calls service.start() when ready.
- * Registers all 21 tools across 4 modules.
+ * Creates shared deps (REST client, buffers, WS service) on the first call.
+ * Subsequent calls reuse the existing singleton instances so that all
+ * sessions share the same WS connection and buffer state.
+ *
+ * The WS service is registered with the Gateway only once.
+ * Tools are registered on every call (the Gateway expects per-session
+ * tool availability).
  */
 export function register(api: PluginAPI): void {
   // Resolve config with full fallback chain:
@@ -53,7 +118,7 @@ export function register(api: PluginAPI): void {
     rawConfig = readConfigFromDisk();
   }
 
-  let config;
+  let config: Config;
   try {
     config = loadConfig(rawConfig);
   } catch (e: unknown) {
@@ -64,38 +129,67 @@ export function register(api: PluginAPI): void {
     throw e;
   }
 
-  // Create the REST client
+  // Create the REST client (stateless — safe to recreate per session)
   const client = new MeshimizeAPI(config);
 
-  // Create message and delegation content buffers
-  const messageBuffer = new MessageBuffer();
-  const delegationContentBuffer = new DelegationContentBuffer();
+  // Warn if a subsequent register() call uses a different config than the
+  // singletons were initialised with.  The WS service keeps using the first
+  // config's credentials/URLs, so a mismatch means tools and WS could talk
+  // to different servers or authenticate with different keys.
+  if (singletonConfig) {
+    const drifted: string[] = [];
+    if (config.apiKey !== singletonConfig.apiKey) drifted.push("apiKey");
+    if (config.baseUrl !== singletonConfig.baseUrl) drifted.push("baseUrl");
+    if (config.wsUrl !== singletonConfig.wsUrl) drifted.push("wsUrl");
+    if (drifted.length > 0) {
+      const verb = drifted.length === 1 ? "differs" : "differ";
+      console.warn(
+        `[meshimize] Config drift detected on re-registration: ${drifted.join(", ")} ` +
+          `${verb} from the initial config used by the WS service. Tools will use the new ` +
+          `REST client, but the WS connection retains the original credentials.`,
+      );
+    }
+  }
 
-  // Create and register the background WS service.
+  // Lazily initialise shared singletons on first successful registration
+  if (!sharedMessageBuffer) {
+    sharedMessageBuffer = new MessageBuffer();
+  }
+  if (!sharedDelegationBuffer) {
+    sharedDelegationBuffer = new DelegationContentBuffer();
+  }
+  if (!sharedPendingJoinMap) {
+    sharedPendingJoinMap = createPendingJoinMap(PENDING_JOIN_DEFAULTS);
+  }
+
+  // Create and register the background WS service only once.
   // The Gateway calls start() when ready — we do NOT call it here.
-  const wsService = createWsService({
-    config,
+  if (!wsServiceInstance) {
+    wsServiceInstance = createWsService({
+      config,
+      api: client,
+      messageBuffer: sharedMessageBuffer,
+      delegationContentBuffer: sharedDelegationBuffer,
+    });
+    api.registerService(wsServiceInstance);
+    singletonConfig = config;
+  }
+
+  // Register group tools (7 tools) — every call
+  registerGroupTools(api, {
     api: client,
-    messageBuffer,
-    delegationContentBuffer,
+    pendingJoins: sharedPendingJoinMap,
+    wsService: wsServiceInstance,
   });
 
-  api.registerService(wsService);
+  // Register messaging tools (4 tools) — every call
+  registerMessageTools(api, { api: client, messageBuffer: sharedMessageBuffer });
 
-  // Create pending join map for operator-gated join flow
-  const pendingJoins = createPendingJoinMap(PENDING_JOIN_DEFAULTS);
+  // Register direct message tools (2 tools) — every call
+  registerDirectMessageTools(api, { api: client, messageBuffer: sharedMessageBuffer });
 
-  // Register group tools (7 tools)
-  registerGroupTools(api, { api: client, pendingJoins, wsService });
-
-  // Register messaging tools (4 tools)
-  registerMessageTools(api, { api: client, messageBuffer });
-
-  // Register direct message tools (2 tools)
-  registerDirectMessageTools(api, { api: client, messageBuffer });
-
-  // Register delegation tools (8 tools)
-  registerDelegationTools(api, { api: client, delegationBuffer: delegationContentBuffer });
+  // Register delegation tools (8 tools) — every call
+  registerDelegationTools(api, { api: client, delegationBuffer: sharedDelegationBuffer });
 }
 
 /**

@@ -32,6 +32,7 @@ vi.mock("node:fs", async (importOriginal) => {
 
 import { readFileSync } from "node:fs";
 import pluginEntry from "../src/index.js";
+import { resetSharedState, getSharedState } from "../src/plugin.js";
 import { createMockPluginAPI } from "./__mocks__/openclaw-plugin-sdk/api.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,8 @@ describe("plugin", () => {
     }
     // Reset readFileSync mock to hermetic default after each test
     vi.mocked(readFileSync).mockImplementation(hermeticReadFileSync as typeof readFileSync);
+    // Reset module-level singletons to ensure test isolation
+    resetSharedState();
   });
 
   describe("pluginEntry structure", () => {
@@ -298,6 +301,141 @@ describe("plugin", () => {
       expect(api._registeredTools).toHaveLength(0);
 
       warnSpy.mockRestore();
+    });
+  });
+
+  describe("singleton behavior", () => {
+    it("registers WS service only once across multiple register() calls", () => {
+      // First registration — fresh API mock
+      const api1 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api1);
+
+      expect(api1._registeredServices).toHaveLength(1);
+      expect(api1._registeredServices[0].id).toBe("meshimize-ws");
+      expect(api1._registeredTools).toHaveLength(21);
+
+      // Second registration — new API mock (simulates a new agent session)
+      const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api2);
+
+      // WS service NOT registered again on the second mock — singleton already exists
+      expect(api2._registeredServices).toHaveLength(0);
+      // Tools ARE registered on every call
+      expect(api2._registeredTools).toHaveLength(21);
+    });
+
+    it("reuses the same singleton instances across multiple register() calls", () => {
+      // First registration
+      const api1 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api1);
+
+      // Capture singleton references after first registration
+      const state1 = getSharedState();
+      expect(state1.messageBuffer).not.toBeNull();
+      expect(state1.delegationBuffer).not.toBeNull();
+      expect(state1.pendingJoinMap).not.toBeNull();
+      expect(state1.wsService).not.toBeNull();
+
+      // Second registration
+      const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api2);
+
+      // Verify exact same object references — proves singleton identity
+      const state2 = getSharedState();
+      expect(state2.messageBuffer).toBe(state1.messageBuffer);
+      expect(state2.delegationBuffer).toBe(state1.delegationBuffer);
+      expect(state2.pendingJoinMap).toBe(state1.pendingJoinMap);
+      expect(state2.wsService).toBe(state1.wsService);
+    });
+
+    it("creates fresh singletons after resetSharedState()", () => {
+      // First registration
+      const api1 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api1);
+      expect(api1._registeredServices).toHaveLength(1);
+      expect(api1._registeredTools).toHaveLength(21);
+
+      const stateBefore = getSharedState();
+      expect(stateBefore.messageBuffer).not.toBeNull();
+
+      // Reset singletons
+      resetSharedState();
+
+      // All references should be cleared
+      const stateAfterReset = getSharedState();
+      expect(stateAfterReset.messageBuffer).toBeNull();
+      expect(stateAfterReset.delegationBuffer).toBeNull();
+      expect(stateAfterReset.pendingJoinMap).toBeNull();
+      expect(stateAfterReset.wsService).toBeNull();
+
+      // Second registration after reset — should create fresh instances
+      const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api2);
+
+      // WS service is registered again because singleton was cleared
+      expect(api2._registeredServices).toHaveLength(1);
+      expect(api2._registeredServices[0].id).toBe("meshimize-ws");
+      expect(api2._registeredTools).toHaveLength(21);
+
+      // New singletons are different objects from the originals
+      const stateAfterReRegister = getSharedState();
+      expect(stateAfterReRegister.messageBuffer).not.toBe(stateBefore.messageBuffer);
+      expect(stateAfterReRegister.delegationBuffer).not.toBe(stateBefore.delegationBuffer);
+      expect(stateAfterReRegister.pendingJoinMap).not.toBe(stateBefore.pendingJoinMap);
+      expect(stateAfterReRegister.wsService).not.toBe(stateBefore.wsService);
+    });
+
+    it("warns on config drift when re-registering with different credentials", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // First registration
+      const api1 = createMockPluginAPI({ apiKey: "mshz_original" });
+      pluginEntry.register(api1);
+      expect(api1._registeredServices).toHaveLength(1);
+
+      // Second registration with a different apiKey
+      const api2 = createMockPluginAPI({ apiKey: "mshz_different" });
+      pluginEntry.register(api2);
+
+      // Should warn about config drift
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Config drift detected"));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("apiKey"));
+
+      warnSpy.mockRestore();
+    });
+
+    it("does not warn when re-registering with the same config", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // First registration
+      const api1 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api1);
+
+      // Second registration with identical config
+      const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api2);
+
+      // No drift warning — only suppress the "registration skipped" warnings if any
+      const driftCalls = warnSpy.mock.calls.filter(
+        (args) => typeof args[0] === "string" && args[0].includes("Config drift"),
+      );
+      expect(driftCalls).toHaveLength(0);
+
+      warnSpy.mockRestore();
+    });
+
+    it("does not create singletons when config validation fails", () => {
+      // Attempt registration with bad config
+      const api1 = createMockPluginAPI({ apiKey: "invalid_key" });
+      pluginEntry.register(api1);
+      expect(api1._registeredServices).toHaveLength(0);
+      expect(api1._registeredTools).toHaveLength(0);
+
+      // Now register with valid config — should create fresh singletons
+      const api2 = createMockPluginAPI({ apiKey: "mshz_test123" });
+      pluginEntry.register(api2);
+      expect(api2._registeredServices).toHaveLength(1);
+      expect(api2._registeredTools).toHaveLength(21);
     });
   });
 
