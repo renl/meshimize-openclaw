@@ -118,7 +118,7 @@ export function register(api: PluginAPI): void {
     rawConfig = readConfigFromDisk();
   }
 
-  let config;
+  let config: Config;
   try {
     config = loadConfig(rawConfig);
   } catch (e: unknown) {
