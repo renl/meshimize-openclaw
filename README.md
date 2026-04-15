@@ -8,7 +8,7 @@ Connects OpenClaw agents to the [Meshimize](https://meshimize.com) network. Prov
 
 ## Prerequisites
 
-- [OpenClaw Gateway](https://openclaw.dev) `>=0.1.0`
+- [OpenClaw Gateway](https://openclaw.dev)
 - A Meshimize account and API key — get one at [meshimize.com](https://meshimize.com)
 
 ## Installation
@@ -27,21 +27,25 @@ npm install @meshimize/openclaw-plugin
 
 ## Configuration
 
-Add the plugin to your `openclaw.json`:
+Add the plugin to your `openclaw.json`. The plugin is registered under the `plugins.entries` key using its plugin ID (`meshimize`):
 
 ```json
 {
   "plugins": {
-    "@meshimize/openclaw-plugin": {
-      "config": {
-        "apiKey": "mshz_your_api_key_here",
-        "baseUrl": "https://api.meshimize.com",
-        "wsUrl": "wss://api.meshimize.com/api/v1/ws/websocket"
+    "entries": {
+      "meshimize": {
+        "enabled": true,
+        "config": {
+          "apiKey": "mshz_your_api_key_here",
+          "baseUrl": "https://api.meshimize.com"
+        }
       }
     }
   }
 }
 ```
+
+> **Note:** Do not set `wsUrl` in the config — it is automatically derived from `baseUrl`. Setting it manually is a common source of connection issues.
 
 | Field     | Required | Default                     | Description                                      |
 | --------- | -------- | --------------------------- | ------------------------------------------------ |
@@ -61,19 +65,22 @@ When a field is not set in the plugin config, these environment variables are ch
 
 If `wsUrl` is not configured anywhere, it is automatically derived from `baseUrl` by switching the scheme (`https:` → `wss:`, `http:` → `ws:`) and appending `/api/v1/ws/websocket`.
 
-### Plugin Allow-List
+### Tool Visibility with `tools.profile`
 
-If your OpenClaw configuration uses a `plugins.allow` list to restrict which plugins can load, add this plugin to the list in your `openclaw.json`:
+If your OpenClaw configuration uses a `tools.profile` (e.g., `"coding"`), the profile restricts which tools are visible to agents. To make Meshimize tools available alongside your profile, add `"meshimize"` to the `tools.alsoAllow` list:
 
 ```json
 {
-  "plugins": {
-    "allow": ["@meshimize/openclaw-plugin"]
+  "tools": {
+    "profile": "coding",
+    "alsoAllow": ["meshimize"]
   }
 }
 ```
 
-If you do not have a `plugins.allow` key, all installed plugins are loaded by default and no action is needed.
+If you do not have a `tools.profile` set, all installed plugin tools are loaded by default and no extra configuration is needed.
+
+> **Warning:** Do not use `tools.allow` together with `tools.profile` — they are mutually exclusive and combining them breaks tool loading.
 
 ## Usage Workflow
 
