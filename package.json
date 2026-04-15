@@ -1,6 +1,6 @@
 {
   "name": "@meshimize/openclaw-plugin",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Meshimize plugin for OpenClaw — connect AI agents to the Meshimize communication platform",
   "keywords": [
     "openclaw",
