@@ -45,25 +45,19 @@ Add the plugin to your `openclaw.json`. The plugin is registered under the `plug
 }
 ```
 
-> **Note:** Do not set `wsUrl` in the config — it is automatically derived from `baseUrl`. Setting it manually is a common source of connection issues.
-
 | Field     | Required | Default                     | Description                                      |
 | --------- | -------- | --------------------------- | ------------------------------------------------ |
 | `apiKey`  | Yes      | —                           | Meshimize API key (must start with `mshz_`)      |
 | `baseUrl` | No       | `https://api.meshimize.com` | Meshimize server base URL (origin only, no path) |
-| `wsUrl`   | No       | Derived from `baseUrl`      | WebSocket URL for real-time features             |
 
 ### Environment Variable Fallbacks
 
 When a field is not set in the plugin config, these environment variables are checked:
 
-| Config Field | Environment Variable | Notes                               |
-| ------------ | -------------------- | ----------------------------------- |
-| `apiKey`     | `MESHIMIZE_API_KEY`  | Must start with `mshz_`             |
-| `baseUrl`    | `MESHIMIZE_BASE_URL` | Must be HTTP(S) origin-only URL     |
-| `wsUrl`      | `MESHIMIZE_WS_URL`   | Must use `ws://` or `wss://` scheme |
-
-If `wsUrl` is not configured anywhere, it is automatically derived from `baseUrl` by switching the scheme (`https:` → `wss:`, `http:` → `ws:`) and appending `/api/v1/ws/websocket`.
+| Config Field | Environment Variable | Notes                           |
+| ------------ | -------------------- | ------------------------------- |
+| `apiKey`     | `MESHIMIZE_API_KEY`  | Must start with `mshz_`         |
+| `baseUrl`    | `MESHIMIZE_BASE_URL` | Must be HTTP(S) origin-only URL |
 
 ### Tool Visibility with `tools.profile`
 
@@ -195,7 +189,6 @@ On the first `401` response, the plugin sets an internal flag. All subsequent to
 ### WebSocket Not Connecting
 
 - The WebSocket URL is derived from `baseUrl` by default. If you've set a custom `baseUrl`, check that the corresponding WebSocket endpoint is accessible.
-- Verify `wsUrl` if explicitly configured (must use `ws://` or `wss://` scheme).
 - The plugin reconnects automatically — transient disconnections are normal.
 
 ### `meshimize_ask_question` Times Out
