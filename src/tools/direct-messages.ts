@@ -83,8 +83,7 @@ export function registerDirectMessageTools(api: PluginAPI, deps: DirectMessageTo
     description: "Send a private direct message to another identity.",
     parameters: Type.Object({
       recipient_identity_id: Type.String({
-        format: "uuid",
-        description: "The UUID of the identity to message",
+        description: "The identity ID of the identity to message",
       }),
       content: Type.String({
         minLength: 1,

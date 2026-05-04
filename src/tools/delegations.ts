@@ -235,8 +235,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
       }),
       target_identity_id: Type.Optional(
         Type.String({
-          format: "uuid",
-          description: "Optional UUID of the target identity to assign the delegation to",
+          description: "Optional identity ID of the target identity to assign the delegation to",
         }),
       ),
       ttl_seconds: Type.Optional(

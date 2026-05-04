@@ -80,6 +80,7 @@ function createMockApi(): {
     invalidKey: false,
     configBaseUrl: "https://api.meshimize.com",
     runtimeIdentity: null,
+    setRuntimeIdentity: vi.fn(),
     getAccount: vi.fn(),
     resolveRuntimeIdentity: vi.fn(),
     searchGroups: vi.fn(),
@@ -587,7 +588,10 @@ describe("registerGroupTools", () => {
 });
 
 describe("plugin registration integration", () => {
+  let previousFetch: typeof globalThis.fetch | undefined;
+
   beforeEach(() => {
+    previousFetch = globalThis.fetch;
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
 
@@ -638,6 +642,11 @@ describe("plugin registration integration", () => {
   });
 
   afterEach(() => {
+    if (previousFetch) {
+      globalThis.fetch = previousFetch;
+    } else {
+      delete (globalThis as { fetch?: typeof fetch }).fetch;
+    }
     vi.restoreAllMocks();
     resetSharedState();
   });

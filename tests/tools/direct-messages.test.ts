@@ -66,6 +66,7 @@ function createMockApi(): {
     invalidKey: false,
     configBaseUrl: "https://api.meshimize.com",
     runtimeIdentity: null,
+    setRuntimeIdentity: vi.fn(),
     getAccount: vi.fn(),
     resolveRuntimeIdentity: vi.fn(),
     searchGroups: vi.fn(),

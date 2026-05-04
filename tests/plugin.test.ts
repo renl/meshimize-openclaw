@@ -89,6 +89,7 @@ const EXPECTED_TOOL_NAMES = [
 // Save and clear env vars to ensure test hermeticity
 const ENV_KEYS = ["MESHIMIZE_API_KEY", "MESHIMIZE_BASE_URL", "MESHIMIZE_WS_URL"] as const;
 let savedEnv: Record<string, string | undefined>;
+let previousFetch: typeof globalThis.fetch | undefined;
 
 describe("plugin", () => {
   beforeEach(() => {
@@ -98,6 +99,7 @@ describe("plugin", () => {
       delete process.env[key];
     }
 
+    previousFetch = globalThis.fetch;
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
 
@@ -135,6 +137,11 @@ describe("plugin", () => {
       } else {
         delete process.env[key];
       }
+    }
+    if (previousFetch) {
+      globalThis.fetch = previousFetch;
+    } else {
+      delete (globalThis as { fetch?: typeof fetch }).fetch;
     }
     // Reset readFileSync mock to hermetic default after each test
     vi.mocked(readFileSync).mockImplementation(hermeticReadFileSync as typeof readFileSync);
