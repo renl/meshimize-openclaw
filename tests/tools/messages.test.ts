@@ -78,14 +78,16 @@ function makePaginatedResponse<T>(
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl" | "runtimeIdentity"
     ? MeshimizeAPI[K]
     : ReturnType<typeof vi.fn>;
 } {
   return {
     invalidKey: false,
     configBaseUrl: "https://api.meshimize.com",
+    runtimeIdentity: null,
     getAccount: vi.fn(),
+    resolveRuntimeIdentity: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
     joinGroup: vi.fn(),
@@ -305,7 +307,7 @@ describe("askQuestionHandler", () => {
     expect(result.answer).toBeDefined();
     expect(result.answer!.id).toBe("a-1");
     expect(result.answer!.content).toBe("The answer is 42");
-    expect(result.answer!.responder_account_id).toBe("responder-1");
+    expect(result.answer!.responder_identity_id).toBe("responder-1");
     expect(result.answer!.responder_display_name).toBe("Responder");
     expect(result.answer!.responder_verified).toBe(true);
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { MeshimizeAPI } from "../../src/api/client.js";
 import type { PendingJoinMap } from "../../src/state/pending-joins.js";
 import type { WsService } from "../../src/services/ws-manager.js";
@@ -18,6 +18,7 @@ import {
 } from "../../src/tools/groups.js";
 import { createMockPluginAPI } from "../__mocks__/openclaw-plugin-sdk/api.js";
 import pluginEntry from "../../src/index.js";
+import { resetSharedState } from "../../src/plugin.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -71,14 +72,16 @@ function makePendingJoinRequest(overrides: Partial<PendingJoinRequest> = {}): Pe
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl" | "runtimeIdentity"
     ? MeshimizeAPI[K]
     : ReturnType<typeof vi.fn>;
 } {
   return {
     invalidKey: false,
     configBaseUrl: "https://api.meshimize.com",
+    runtimeIdentity: null,
     getAccount: vi.fn(),
+    resolveRuntimeIdentity: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
     joinGroup: vi.fn(),
@@ -361,7 +364,12 @@ describe("approveJoinHandler", () => {
   it("completes join: REST call + removes pending + subscribes WS + returns joined", async () => {
     deps._pendingJoins.getByGroupId.mockReturnValue(makePendingJoinRequest());
     deps._api.joinGroup.mockResolvedValue({
-      data: { group_id: "g-111-222-333", account_id: "acct-1", role: "member", created_at: "now" },
+      data: {
+        group_id: "g-111-222-333",
+        identity_id: "identity-1",
+        role: "member",
+        created_at: "now",
+      },
     });
     deps._wsService.subscribeToGroup.mockResolvedValue(undefined);
 
@@ -579,24 +587,79 @@ describe("registerGroupTools", () => {
 });
 
 describe("plugin registration integration", () => {
-  it("registers 1 service + 21 tools after pluginEntry.register", () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.includes("/api/v1/account")) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              id: "acct-123",
+              email: "test@example.com",
+              display_name: "Parent Account",
+              description: null,
+              verified: true,
+              current_identity: {
+                id: "identity-123",
+                display_name: "Acting Identity",
+                is_default: true,
+              },
+              inserted_at: "2026-01-01T00:00:00Z",
+              created_at: "2026-01-01T00:00:00Z",
+              updated_at: "2026-01-01T00:00:00Z",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (url.includes("/api/v1/groups")) {
+        return new Response(
+          JSON.stringify({ data: [], meta: { has_more: false, next_cursor: null, count: 0 } }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ data: [], meta: { has_more: false, next_cursor: null, count: 0 } }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof fetch;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetSharedState();
+  });
+
+  it("registers 1 service + 21 tools after pluginEntry.register", async () => {
     const api = createMockPluginAPI({
       apiKey: "mshz_test123",
       baseUrl: "https://meshimize.fly.dev",
     });
-    pluginEntry.register(api);
+    await pluginEntry.register(api);
 
     expect(api._registeredServices).toHaveLength(1);
     expect(api._registeredServices[0].id).toBe("meshimize-ws");
     expect(api._registeredTools).toHaveLength(21);
   });
 
-  it("all 21 tools have meshimize_ prefix", () => {
+  it("all 21 tools have meshimize_ prefix", async () => {
     const api = createMockPluginAPI({
       apiKey: "mshz_test123",
       baseUrl: "https://meshimize.fly.dev",
     });
-    pluginEntry.register(api);
+    await pluginEntry.register(api);
 
     for (const tool of api._registeredTools) {
       expect(tool.name).toMatch(/^meshimize_/);

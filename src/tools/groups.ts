@@ -38,7 +38,7 @@ export interface GroupToolDeps {
 // ---------------------------------------------------------------------------
 
 /**
- * Paginates through the authenticated account's groups to find one by ID.
+ * Paginates through the authenticated identity's groups to find one by ID.
  * Ported from meshimize-mcp/src/tools/my-groups.ts.
  */
 export async function findMyGroupById(

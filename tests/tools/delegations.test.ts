@@ -27,11 +27,11 @@ function makeDelegation(overrides: Partial<Delegation> = {}): Delegation {
     state: "pending",
     group_id: "g-1",
     group_name: "Test Group",
-    sender_account_id: "acct-sender",
+    sender_identity_id: "identity-sender",
     sender_display_name: "Sender",
-    target_account_id: null,
+    target_identity_id: null,
     target_display_name: null,
-    assignee_account_id: null,
+    assignee_identity_id: null,
     assignee_display_name: null,
     description: "Do the thing",
     result: null,
@@ -63,14 +63,16 @@ function makePaginatedResponse<T>(
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl" | "runtimeIdentity"
     ? MeshimizeAPI[K]
     : ReturnType<typeof vi.fn>;
 } {
   return {
     invalidKey: false,
     configBaseUrl: "https://api.meshimize.com",
+    runtimeIdentity: null,
     getAccount: vi.fn(),
+    resolveRuntimeIdentity: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
     joinGroup: vi.fn(),
@@ -222,7 +224,7 @@ describe("createDelegationHandler", () => {
     expect(deps.delegationBuffer.get("del-new")?.description).toBe("Task desc");
   });
 
-  it("passes optional target_account_id and ttl_seconds", async () => {
+  it("passes optional target_identity_id and ttl_seconds", async () => {
     const delegation = makeDelegation();
     deps._api.createDelegation.mockResolvedValue({ data: delegation });
 
@@ -230,7 +232,7 @@ describe("createDelegationHandler", () => {
       {
         group_id: "g-1",
         description: "Task",
-        target_account_id: "acct-target",
+        target_identity_id: "identity-target",
         ttl_seconds: 7200,
       },
       deps,
@@ -239,7 +241,7 @@ describe("createDelegationHandler", () => {
     expect(deps._api.createDelegation).toHaveBeenCalledWith({
       group_id: "g-1",
       description: "Task",
-      target_account_id: "acct-target",
+      target_identity_id: "identity-target",
       ttl_seconds: 7200,
     });
   });
@@ -347,7 +349,7 @@ describe("acceptDelegationHandler", () => {
     const delegation = makeDelegation({
       id: "del-1",
       state: "accepted",
-      assignee_account_id: "acct-assignee",
+      assignee_identity_id: "identity-assignee",
     });
     deps._api.acceptDelegation.mockResolvedValue({ data: delegation });
 

@@ -2,6 +2,31 @@
   "id": "meshimize",
   "name": "Meshimize",
   "description": "Connect to the Meshimize communication platform — search groups, ask questions, delegate tasks, and exchange messages with other AI agents and humans.",
+  "contracts": {
+    "tools": [
+      "meshimize_search_groups",
+      "meshimize_list_my_groups",
+      "meshimize_join_group",
+      "meshimize_approve_join",
+      "meshimize_reject_join",
+      "meshimize_list_pending_joins",
+      "meshimize_leave_group",
+      "meshimize_get_messages",
+      "meshimize_post_message",
+      "meshimize_ask_question",
+      "meshimize_get_pending_questions",
+      "meshimize_send_direct_message",
+      "meshimize_get_direct_messages",
+      "meshimize_create_delegation",
+      "meshimize_list_delegations",
+      "meshimize_get_delegation",
+      "meshimize_accept_delegation",
+      "meshimize_complete_delegation",
+      "meshimize_cancel_delegation",
+      "meshimize_acknowledge_delegation",
+      "meshimize_extend_delegation"
+    ]
+  },
   "configSchema": {
     "type": "object",
     "properties": {

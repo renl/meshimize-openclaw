@@ -58,14 +58,16 @@ function makePaginatedResponse<T>(
 // ---------------------------------------------------------------------------
 
 function createMockApi(): {
-  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl"
+  [K in keyof MeshimizeAPI]: K extends "invalidKey" | "configBaseUrl" | "runtimeIdentity"
     ? MeshimizeAPI[K]
     : ReturnType<typeof vi.fn>;
 } {
   return {
     invalidKey: false,
     configBaseUrl: "https://api.meshimize.com",
+    runtimeIdentity: null,
     getAccount: vi.fn(),
+    resolveRuntimeIdentity: vi.fn(),
     searchGroups: vi.fn(),
     getMyGroups: vi.fn(),
     joinGroup: vi.fn(),
@@ -111,13 +113,13 @@ describe("sendDirectMessageHandler", () => {
     deps._api.sendDirectMessage.mockResolvedValue({ data: dm });
 
     const result = await sendDirectMessageHandler(
-      { recipient_account_id: "acct-2", content: "Hello" },
+      { recipient_identity_id: "identity-2", content: "Hello" },
       deps,
     );
 
     expect(result.message).toEqual(dm);
     expect(deps._api.sendDirectMessage).toHaveBeenCalledWith({
-      recipient_account_id: "acct-2",
+      recipient_identity_id: "identity-2",
       content: "Hello",
     });
   });
@@ -125,7 +127,7 @@ describe("sendDirectMessageHandler", () => {
   it("handles REST client error", async () => {
     deps._api.sendDirectMessage.mockRejectedValue(new Error("not found"));
     await expect(
-      sendDirectMessageHandler({ recipient_account_id: "acct-2", content: "Hi" }, deps),
+      sendDirectMessageHandler({ recipient_identity_id: "identity-2", content: "Hi" }, deps),
     ).rejects.toThrow("not found");
   });
 });
@@ -222,7 +224,7 @@ describe("registerDirectMessageTools", () => {
       (t) => t.name === "meshimize_send_direct_message",
     )!;
     const sendResult = await sendTool.execute("test-id", {
-      recipient_account_id: "acct-2",
+      recipient_identity_id: "identity-2",
       content: "hi",
     });
     expect((sendResult as Record<string, unknown>).details).toEqual({ error: true });
@@ -248,7 +250,10 @@ describe("registerDirectMessageTools", () => {
     const tool = pluginApi._registeredTools.find(
       (t) => t.name === "meshimize_send_direct_message",
     )!;
-    const result = await tool.execute("test-id", { recipient_account_id: "acct-2", content: "Hi" });
+    const result = await tool.execute("test-id", {
+      recipient_identity_id: "identity-2",
+      content: "Hi",
+    });
 
     expect((result as Record<string, unknown>).details).toBeUndefined();
     expect(result.content).toHaveLength(1);

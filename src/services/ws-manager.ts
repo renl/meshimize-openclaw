@@ -3,7 +3,7 @@
  *
  * Registered via `api.registerService(...)` per architecture §4.3.
  * Maintains persistent WS connection to the Meshimize server, subscribes
- * to group and account channels, and routes pushed events to local buffers.
+ * to group and identity channels, and routes pushed events to local buffers.
  *
  * OpenClaw calls `start()` when the Gateway is ready and `stop()` on shutdown.
  * Process exit handlers (SIGTERM/SIGINT) provide fallback cleanup per OQ-1.
@@ -15,6 +15,7 @@ import type { MessageBuffer } from "../buffer/message-buffer.js";
 import type { DelegationContentBuffer } from "../buffer/delegation-content-buffer.js";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { Config } from "../config.js";
+import type { RuntimeIdentityContext } from "../types/api.js";
 import type { MessageDataResponse, DirectMessageDataResponse } from "../types/messages.js";
 import type {
   OpenClawPluginService,
@@ -26,6 +27,7 @@ export interface WsManagerDeps {
   api: MeshimizeAPI;
   messageBuffer: MessageBuffer;
   delegationContentBuffer: DelegationContentBuffer;
+  runtimeIdentity?: RuntimeIdentityContext;
 }
 
 /**
@@ -45,7 +47,7 @@ export function createWsService(deps: WsManagerDeps): WsService {
   const groupChannels: Map<string, Channel> = new Map();
   const groupMessageHandlers: Map<string, (payload: unknown) => void> = new Map();
   // Retained for future tool slice use (Slice 4+: DM tools may need to access it)
-  let _accountChannel: Channel | null = null;
+  let _identityChannel: Channel | null = null;
   // Account channel handler references — stored for cleanup on reconnect (Issue A)
   let accountDmHandler: ((payload: unknown) => void) | null = null;
   let accountDelegationCreatedHandler: ((payload: unknown) => void) | null = null;
@@ -132,36 +134,39 @@ export function createWsService(deps: WsManagerDeps): WsService {
 
   async function subscribeInitialChannels(): Promise<void> {
     if (!socket || socket.getState() !== "connected") return;
+    const runtimeIdentity = deps.runtimeIdentity ?? api.runtimeIdentity;
+    if (!runtimeIdentity) {
+      console.error("[meshimize-ws] Cannot subscribe initial channels without runtime identity.");
+      return;
+    }
 
-    // Get account info for account channel
     try {
-      const accountResponse = await api.getAccount();
-      const accountId = accountResponse.data.id;
+      const identityId = runtimeIdentity.current_identity.id;
 
-      // Clean up any existing account channel before re-subscribing (Issue A: handler accumulation)
-      if (_accountChannel) {
+      // Clean up any existing identity channel before re-subscribing (Issue A: handler accumulation)
+      if (_identityChannel) {
         if (accountDmHandler) {
-          _accountChannel.off("new_direct_message", accountDmHandler);
+          _identityChannel.off("new_direct_message", accountDmHandler);
           accountDmHandler = null;
         }
         if (accountDelegationCreatedHandler) {
-          _accountChannel.off("delegation_created", accountDelegationCreatedHandler);
+          _identityChannel.off("delegation_created", accountDelegationCreatedHandler);
           accountDelegationCreatedHandler = null;
         }
         if (accountDelegationUpdatedHandler) {
-          _accountChannel.off("delegation_updated", accountDelegationUpdatedHandler);
+          _identityChannel.off("delegation_updated", accountDelegationUpdatedHandler);
           accountDelegationUpdatedHandler = null;
         }
-        await _accountChannel.leave();
-        socket.removeChannel(`account:${accountId}`);
-        _accountChannel = null;
+        await _identityChannel.leave();
+        socket.removeChannel(`identity:${identityId}`);
+        _identityChannel = null;
       }
 
-      // Subscribe to account channel for DMs and delegation events
-      const acctCh = socket.channel(`account:${accountId}`);
+      // Subscribe to identity channel for DMs and delegation events
+      const acctCh = socket.channel(`identity:${identityId}`);
       try {
         await acctCh.join();
-        _accountChannel = acctCh;
+        _identityChannel = acctCh;
 
         // Store handler references for cleanup on reconnect (Issue A)
         // Listen for direct messages (Fix 5: stronger runtime validation)
@@ -184,7 +189,7 @@ export function createWsService(deps: WsManagerDeps): WsService {
         acctCh.on("delegation_updated", accountDelegationUpdatedHandler);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[meshimize-ws] Failed to join account channel: ${msg}`);
+        console.error(`[meshimize-ws] Failed to join identity channel: ${msg}`);
       }
 
       // Get groups and subscribe
@@ -293,7 +298,7 @@ export function createWsService(deps: WsManagerDeps): WsService {
     }
     groupChannels.clear();
     groupMessageHandlers.clear();
-    _accountChannel = null;
+    _identityChannel = null;
     accountDmHandler = null;
     accountDelegationCreatedHandler = null;
     accountDelegationUpdatedHandler = null;

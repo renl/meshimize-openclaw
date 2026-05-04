@@ -141,7 +141,7 @@ export async function askQuestionHandler(
         answer: {
           id: answer.id,
           content: answer.content,
-          responder_account_id: answer.sender.id,
+          responder_identity_id: answer.sender.id,
           responder_display_name: answer.sender.display_name,
           responder_verified: answer.sender.verified,
           created_at: answer.created_at,

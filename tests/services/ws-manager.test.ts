@@ -124,18 +124,33 @@ import type { Config } from "../../src/config.js";
 // Mock the MeshimizeAPI
 function createMockApi() {
   return {
+    runtimeIdentity: {
+      account: {
+        id: "acct-001",
+        display_name: "Parent Account",
+        verified: true,
+      },
+      current_identity: {
+        id: "identity-001",
+        display_name: "Acting Identity",
+      },
+    },
     getAccount: vi.fn().mockResolvedValue({
       data: {
         id: "acct-001",
         email: "test@example.com",
-        display_name: "Test Agent",
+        display_name: "Parent Account",
         description: null,
-        allow_direct_connections: true,
         verified: true,
+        current_identity: {
+          id: "identity-001",
+          display_name: "Acting Identity",
+        },
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
       },
     }),
+    resolveRuntimeIdentity: vi.fn(),
     getMyGroups: vi.fn().mockResolvedValue({
       data: [
         {
@@ -213,6 +228,17 @@ describe("WsManager — createWsService", () => {
       api: mockApi,
       messageBuffer,
       delegationContentBuffer,
+      runtimeIdentity: {
+        account: {
+          id: "acct-001",
+          display_name: "Parent Account",
+          verified: true,
+        },
+        current_identity: {
+          id: "identity-001",
+          display_name: "Acting Identity",
+        },
+      },
     });
 
     expect(service.id).toBe("meshimize-ws");
@@ -261,7 +287,7 @@ describe("WsManager — createWsService", () => {
       expect(service.getSocket()).not.toBeNull();
     });
 
-    it("subscribes to account channel", async () => {
+    it("subscribes to identity channel", async () => {
       const service = createWsService({
         config,
         api: mockApi,
@@ -272,8 +298,7 @@ describe("WsManager — createWsService", () => {
 
       await service.start();
 
-      expect(mockApi.getAccount).toHaveBeenCalled();
-      const acctChannel = mockChannels.get("account:acct-001");
+      const acctChannel = mockChannels.get("identity:identity-001");
       expect(acctChannel).toBeDefined();
       expect(acctChannel!.joinCalled).toBe(true);
     });
@@ -313,8 +338,8 @@ describe("WsManager — createWsService", () => {
       // Should NOT throw
       await expect(service.start()).resolves.toBeUndefined();
 
-      // API calls should NOT have been made (connection failed)
-      expect(mockApi.getAccount).not.toHaveBeenCalled();
+      // Group lookup should NOT have been made (connection failed)
+      expect(mockApi.getMyGroups).not.toHaveBeenCalled();
     });
 
     it("subscribes to channels on reconnect after initial connection failure", async () => {
@@ -330,8 +355,8 @@ describe("WsManager — createWsService", () => {
 
       await service.start();
 
-      // Initial connect failed — API should not have been called
-      expect(mockApi.getAccount).not.toHaveBeenCalled();
+      // Initial connect failed — group subscription path should not have run
+      expect(mockApi.getMyGroups).not.toHaveBeenCalled();
 
       // Simulate reconnect success: PhoenixSocket reconnects and fires onStateChange("connected")
       mockSocketConnected = true;
@@ -341,13 +366,12 @@ describe("WsManager — createWsService", () => {
       // Allow async subscribeInitialChannels to settle
       await new Promise((r) => setTimeout(r, 0));
 
-      // API should now have been called — channels subscribed on reconnect
-      expect(mockApi.getAccount).toHaveBeenCalled();
+      // Group API should now have been called — channels subscribed on reconnect
       expect(mockApi.getMyGroups).toHaveBeenCalled();
     });
 
-    it("handles getAccount failure gracefully — does not throw", async () => {
-      (mockApi.getAccount as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("API error"));
+    it("handles missing runtime identity gracefully — does not throw", async () => {
+      (mockApi as { runtimeIdentity?: unknown }).runtimeIdentity = undefined;
 
       const service = createWsService({
         config,
@@ -357,8 +381,38 @@ describe("WsManager — createWsService", () => {
       });
       activeService = service;
 
-      // Should NOT throw
+      // Should NOT throw even though identity bootstrap context is absent
       await expect(service.start()).resolves.toBeUndefined();
+    });
+
+    it("reads runtime identity at start time, not only at service creation time", async () => {
+      (mockApi as { runtimeIdentity?: unknown }).runtimeIdentity = undefined;
+
+      const service = createWsService({
+        config,
+        api: mockApi,
+        messageBuffer,
+        delegationContentBuffer,
+      });
+      activeService = service;
+
+      (mockApi as { runtimeIdentity?: unknown }).runtimeIdentity = {
+        account: {
+          id: "acct-001",
+          display_name: "Parent Account",
+          verified: true,
+        },
+        current_identity: {
+          id: "identity-001",
+          display_name: "Acting Identity",
+        },
+      };
+
+      await service.start();
+
+      const acctChannel = mockChannels.get("identity:identity-001");
+      expect(acctChannel).toBeDefined();
+      expect(acctChannel!.joinCalled).toBe(true);
     });
   });
 
@@ -407,7 +461,7 @@ describe("WsManager — createWsService", () => {
 
       await service.start();
 
-      const acctCh = mockChannels.get("account:acct-001");
+      const acctCh = mockChannels.get("identity:identity-001");
       expect(acctCh).toBeDefined();
 
       const testDM = {
@@ -488,7 +542,7 @@ describe("WsManager — createWsService", () => {
 
       await service.start();
 
-      const acctCh = mockChannels.get("account:acct-001");
+      const acctCh = mockChannels.get("identity:identity-001");
       expect(acctCh).toBeDefined();
 
       acctCh!.trigger("delegation_created", {
@@ -513,7 +567,7 @@ describe("WsManager — createWsService", () => {
 
       await service.start();
 
-      const acctCh = mockChannels.get("account:acct-001");
+      const acctCh = mockChannels.get("identity:identity-001");
       expect(acctCh).toBeDefined();
 
       acctCh!.trigger("delegation_updated", {
@@ -539,7 +593,7 @@ describe("WsManager — createWsService", () => {
 
       await service.start();
 
-      const acctCh = mockChannels.get("account:acct-001");
+      const acctCh = mockChannels.get("identity:identity-001");
       expect(acctCh).toBeDefined();
 
       acctCh!.trigger("delegation_created", { description: "no id" });
@@ -921,7 +975,7 @@ describe("WsManager — createWsService", () => {
       expect(messageBuffer.getGroupMessages("group-001")).toHaveLength(0);
     });
 
-    it("account channel handlers do not accumulate on reconnect", async () => {
+    it("identity channel handlers do not accumulate on reconnect", async () => {
       const service = createWsService({
         config,
         api: mockApi,
@@ -932,8 +986,8 @@ describe("WsManager — createWsService", () => {
 
       await service.start();
 
-      // Get the account channel after initial subscribe
-      const acctCh = mockChannels.get("account:acct-001");
+      // Get the identity channel after initial subscribe
+      const acctCh = mockChannels.get("identity:identity-001");
       expect(acctCh).toBeDefined();
 
       // Count initial handlers for new_direct_message
@@ -943,13 +997,13 @@ describe("WsManager — createWsService", () => {
       // Simulate reconnect — onStateChange fires "connected" again, which calls subscribeInitialChannels
       // First, we need to delete the old channel from mockChannels so a fresh one is created
       // (simulating removeChannel effect)
-      mockChannels.delete("account:acct-001");
+      mockChannels.delete("identity:identity-001");
 
       mockOnStateChange!("connected");
       await new Promise((r) => setTimeout(r, 0));
 
-      // A new account channel should have been created with exactly 1 handler per event
-      const newAcctCh = mockChannels.get("account:acct-001");
+      // A new identity channel should have been created with exactly 1 handler per event
+      const newAcctCh = mockChannels.get("identity:identity-001");
       expect(newAcctCh).toBeDefined();
       expect(newAcctCh!.handlers.get("new_direct_message")?.length ?? 0).toBe(1);
       expect(newAcctCh!.handlers.get("delegation_created")?.length ?? 0).toBe(1);

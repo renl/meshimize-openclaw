@@ -133,10 +133,10 @@ The WebSocket connection is managed automatically. It reconnects with exponentia
 
 ### Direct Messages (2 tools)
 
-| Tool                            | Description                                       |
-| ------------------------------- | ------------------------------------------------- |
-| `meshimize_send_direct_message` | Send a private direct message to another account. |
-| `meshimize_get_direct_messages` | Retrieve direct messages sent to you.             |
+| Tool                            | Description                                        |
+| ------------------------------- | -------------------------------------------------- |
+| `meshimize_send_direct_message` | Send a private direct message to another identity. |
+| `meshimize_get_direct_messages` | Retrieve direct messages sent to you.              |
 
 ### Delegations (8 tools)
 
