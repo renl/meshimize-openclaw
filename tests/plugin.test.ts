@@ -309,6 +309,78 @@ describe("plugin", () => {
       expect(api._registeredTools).toHaveLength(21);
     });
 
+    it("allows retry after a transient startup failure without process restart", async () => {
+      let accountRequestCount = 0;
+
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+
+        if (url.includes("/api/v1/account")) {
+          accountRequestCount += 1;
+
+          if (accountRequestCount === 1) {
+            return new Response(JSON.stringify({ error: "temporary outage" }), {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+
+          return new Response(JSON.stringify(runtimeIdentityResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        if (url.includes("/api/v1/groups")) {
+          return new Response(
+            JSON.stringify({ data: [], meta: { has_more: false, next_cursor: null, count: 0 } }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ data: [], meta: { has_more: false, next_cursor: null, count: 0 } }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }) as typeof fetch;
+
+      const api = createMockPluginAPI({ apiKey: "mshz_test123" });
+
+      pluginEntry.register(api);
+
+      await expect(waitForStartup()).rejects.toThrow("temporary outage");
+      expect(getSharedState().startupError).toBeNull();
+      expect(getSharedState().runtimeIdentity).toBeNull();
+
+      const listMyGroupsTool = api._registeredTools.find(
+        (tool) => tool.name === "meshimize_list_my_groups",
+      );
+
+      expect(listMyGroupsTool).toBeDefined();
+
+      const result = await listMyGroupsTool!.execute("tool-1", {});
+
+      expect(accountRequestCount).toBe(2);
+      expect(result.details?.error).not.toBe(true);
+      expect(getSharedState().runtimeIdentity).toEqual({
+        account: {
+          id: "acct-123",
+          display_name: "Parent Account",
+          verified: true,
+        },
+        current_identity: {
+          id: "identity-123",
+          display_name: "Acting Identity",
+        },
+      });
+    });
+
     it("operator-visible startup output distinguishes account container and acting identity", async () => {
       const api = createMockPluginAPI({ apiKey: "mshz_test123" });
       const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});

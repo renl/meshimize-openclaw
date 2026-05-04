@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { loadConfig, ConfigValidationError, type Config } from "./config.js";
-import { MeshimizeAPI } from "./api/client.js";
+import { MeshimizeAPI, MeshimizeAPIError } from "./api/client.js";
 import { MessageBuffer } from "./buffer/message-buffer.js";
 import { DelegationContentBuffer } from "./buffer/delegation-content-buffer.js";
 import { createWsService, type WsService } from "./services/ws-manager.js";
@@ -104,6 +104,33 @@ function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+function isRetryableStartupError(error: Error): boolean {
+  if (error instanceof MeshimizeAPIError) {
+    return error.status >= 500;
+  }
+
+  const message = error.message.toLowerCase();
+  const networkPatterns = [
+    "econnrefused",
+    "enotfound",
+    "econnreset",
+    "etimedout",
+    "fetch failed",
+    "network",
+  ];
+
+  if (networkPatterns.some((pattern) => message.includes(pattern))) {
+    return true;
+  }
+
+  if (error instanceof TypeError && error.cause instanceof Error) {
+    const causeMessage = error.cause.message.toLowerCase();
+    return networkPatterns.some((pattern) => causeMessage.includes(pattern));
+  }
+
+  return false;
+}
+
 function logResolvedIdentity(resolvedIdentity: RuntimeIdentityContext): void {
   console.info(
     `[meshimize] Connected as ${resolvedIdentity.current_identity.display_name} ` +
@@ -152,7 +179,14 @@ function ensureStartup(client: MeshimizeAPI): Promise<RuntimeIdentityContext> {
         return resolvedIdentity;
       })
       .catch((error: unknown) => {
-        startupError = toError(error);
+        const resolvedError = toError(error);
+
+        if (isRetryableStartupError(resolvedError)) {
+          startupPromise = null;
+          throw resolvedError;
+        }
+
+        startupError = resolvedError;
         throw startupError;
       });
   }
