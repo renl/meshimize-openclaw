@@ -6,7 +6,7 @@
  */
 
 import type { Config } from "../config.js";
-import type { AccountResponse, PaginatedResponse } from "../types/api.js";
+import type { AccountResponse, PaginatedResponse, RuntimeIdentityContext } from "../types/api.js";
 import type { GroupResponse, GroupJoinResponse } from "../types/groups.js";
 import type {
   MessageDataResponse,
@@ -61,6 +61,7 @@ export class MeshimizeAPI {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private _invalidKey: boolean = false;
+  private _runtimeIdentity: RuntimeIdentityContext | null = null;
 
   constructor(config: Config) {
     // Strip trailing slash from baseUrl, then append /api/v1
@@ -76,6 +77,15 @@ export class MeshimizeAPI {
   /** Returns the configured base URL (without /api/v1 suffix). */
   get configBaseUrl(): string {
     return this.baseUrl.replace(/\/api\/v1$/, "");
+  }
+
+  /** Returns the startup-resolved acting identity context, if available. */
+  get runtimeIdentity(): RuntimeIdentityContext | null {
+    return this._runtimeIdentity;
+  }
+
+  setRuntimeIdentity(context: RuntimeIdentityContext): void {
+    this._runtimeIdentity = context;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -175,6 +185,32 @@ export class MeshimizeAPI {
     return this.request("GET", "/account");
   }
 
+  async resolveRuntimeIdentity(): Promise<RuntimeIdentityContext> {
+    const response = await this.getAccount();
+    const account = response.data;
+
+    if (!isRuntimeIdentityContext(account)) {
+      throw new Error(
+        "Meshimize startup failed: /api/v1/account returned missing or malformed current_identity.",
+      );
+    }
+
+    const context: RuntimeIdentityContext = {
+      account: {
+        id: account.id,
+        display_name: account.display_name,
+        verified: account.verified,
+      },
+      current_identity: {
+        id: account.current_identity.id,
+        display_name: account.current_identity.display_name,
+      },
+    };
+
+    this._runtimeIdentity = context;
+    return context;
+  }
+
   // --- Groups ---
   async searchGroups(params?: {
     q?: string;
@@ -255,7 +291,7 @@ export class MeshimizeAPI {
   }
 
   async sendDirectMessage(body: {
-    recipient_account_id: string;
+    recipient_identity_id: string;
     content: string;
   }): Promise<{ data: DirectMessageDataResponse }> {
     return this.request("POST", "/direct-messages", body);
@@ -265,7 +301,7 @@ export class MeshimizeAPI {
   async createDelegation(body: {
     group_id: string;
     description: string;
-    target_account_id?: string;
+    target_identity_id?: string;
     ttl_seconds?: number;
   }): Promise<{ data: Delegation }> {
     return this.request("POST", "/delegations", body);
@@ -314,4 +350,19 @@ export class MeshimizeAPI {
   ): Promise<{ data: Delegation }> {
     return this.request("POST", `/delegations/${id}/extend`, body);
   }
+}
+
+function isRuntimeIdentityContext(account: AccountResponse): account is AccountResponse & {
+  current_identity: { id: string; display_name: string };
+} {
+  return (
+    typeof account === "object" &&
+    account !== null &&
+    typeof account.current_identity === "object" &&
+    account.current_identity !== null &&
+    typeof account.current_identity.id === "string" &&
+    account.current_identity.id.length > 0 &&
+    typeof account.current_identity.display_name === "string" &&
+    account.current_identity.display_name.length > 0
+  );
 }

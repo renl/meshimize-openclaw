@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { loadConfig, ConfigValidationError, type Config } from "./config.js";
-import { MeshimizeAPI } from "./api/client.js";
+import { MeshimizeAPI, MeshimizeAPIError } from "./api/client.js";
 import { MessageBuffer } from "./buffer/message-buffer.js";
 import { DelegationContentBuffer } from "./buffer/delegation-content-buffer.js";
 import { createWsService, type WsService } from "./services/ws-manager.js";
@@ -26,6 +26,8 @@ import { registerGroupTools } from "./tools/groups.js";
 import { registerMessageTools } from "./tools/messages.js";
 import { registerDirectMessageTools } from "./tools/direct-messages.js";
 import { registerDelegationTools } from "./tools/delegations.js";
+import type { RuntimeIdentityContext } from "./types/api.js";
+import { errorResult, formatToolError } from "./errors.js";
 
 // ── Module-level singletons ──────────────────────────────────────────────
 // Survive across multiple register() calls so the WS service and every
@@ -34,6 +36,9 @@ let sharedMessageBuffer: MessageBuffer | null = null;
 let sharedDelegationBuffer: DelegationContentBuffer | null = null;
 let sharedPendingJoinMap: ReturnType<typeof createPendingJoinMap> | null = null;
 let wsServiceInstance: WsService | null = null;
+let runtimeIdentityContext: RuntimeIdentityContext | null = null;
+let startupPromise: Promise<RuntimeIdentityContext> | null = null;
+let startupError: Error | null = null;
 /** Config snapshot from the first successful register() — used to warn on drift. */
 let singletonConfig: Config | null = null;
 
@@ -46,13 +51,23 @@ export function getSharedState(): {
   delegationBuffer: DelegationContentBuffer | null;
   pendingJoinMap: ReturnType<typeof createPendingJoinMap> | null;
   wsService: WsService | null;
+  runtimeIdentity: RuntimeIdentityContext | null;
+  startupPromise: Promise<RuntimeIdentityContext> | null;
+  startupError: Error | null;
 } {
   return {
     messageBuffer: sharedMessageBuffer,
     delegationBuffer: sharedDelegationBuffer,
     pendingJoinMap: sharedPendingJoinMap,
     wsService: wsServiceInstance,
+    runtimeIdentity: runtimeIdentityContext,
+    startupPromise,
+    startupError,
   };
+}
+
+export function waitForStartup(): Promise<RuntimeIdentityContext | null> {
+  return startupPromise ?? Promise.resolve(runtimeIdentityContext);
 }
 
 /**
@@ -79,7 +94,142 @@ export function resetSharedState(): void {
   sharedDelegationBuffer = null;
   sharedPendingJoinMap = null;
   wsServiceInstance = null;
+  runtimeIdentityContext = null;
+  startupPromise = null;
+  startupError = null;
   singletonConfig = null;
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function isRetryableStartupError(error: Error): boolean {
+  if (error instanceof MeshimizeAPIError) {
+    return error.status >= 500;
+  }
+
+  const message = error.message.toLowerCase();
+  const networkPatterns = [
+    "econnrefused",
+    "enotfound",
+    "econnreset",
+    "etimedout",
+    "fetch failed",
+    "network",
+  ];
+
+  if (networkPatterns.some((pattern) => message.includes(pattern))) {
+    return true;
+  }
+
+  if (error instanceof TypeError && error.cause instanceof Error) {
+    const causeMessage = error.cause.message.toLowerCase();
+    return networkPatterns.some((pattern) => causeMessage.includes(pattern));
+  }
+
+  return false;
+}
+
+function logResolvedIdentity(resolvedIdentity: RuntimeIdentityContext): void {
+  console.info(
+    `[meshimize] Connected as ${resolvedIdentity.current_identity.display_name} ` +
+      `(identity ${resolvedIdentity.current_identity.id}) under account ` +
+      `${resolvedIdentity.account.display_name}.`,
+  );
+}
+
+function bindClientToStartup(client: MeshimizeAPI): void {
+  if (runtimeIdentityContext) {
+    client.setRuntimeIdentity(runtimeIdentityContext);
+    return;
+  }
+
+  if (!startupPromise) {
+    return;
+  }
+
+  void startupPromise
+    .then((resolvedIdentity) => {
+      client.setRuntimeIdentity(resolvedIdentity);
+    })
+    .catch(() => {
+      // Shared startup failure is surfaced via the gate.
+    });
+}
+
+function ensureStartup(client: MeshimizeAPI): Promise<RuntimeIdentityContext> {
+  if (runtimeIdentityContext) {
+    client.setRuntimeIdentity(runtimeIdentityContext);
+    return Promise.resolve(runtimeIdentityContext);
+  }
+
+  if (startupError) {
+    return Promise.reject(startupError);
+  }
+
+  if (!startupPromise) {
+    startupPromise = client
+      .resolveRuntimeIdentity()
+      .then((resolvedIdentity) => {
+        runtimeIdentityContext = resolvedIdentity;
+        startupError = null;
+        client.setRuntimeIdentity(resolvedIdentity);
+        logResolvedIdentity(resolvedIdentity);
+        return resolvedIdentity;
+      })
+      .catch((error: unknown) => {
+        const resolvedError = toError(error);
+
+        if (isRetryableStartupError(resolvedError)) {
+          startupPromise = null;
+          throw resolvedError;
+        }
+
+        startupError = resolvedError;
+        throw startupError;
+      });
+  }
+
+  bindClientToStartup(client);
+  return startupPromise;
+}
+
+function createStartupGatedApi(api: PluginAPI, client: MeshimizeAPI): PluginAPI {
+  return {
+    ...api,
+    registerTool(tool, opts) {
+      if (typeof tool !== "object" || tool === null || typeof tool.execute !== "function") {
+        api.registerTool(tool, opts);
+        return;
+      }
+
+      api.registerTool(
+        {
+          ...tool,
+          execute: async (id: string, params: Record<string, unknown>) => {
+            try {
+              await ensureStartup(client);
+            } catch (error: unknown) {
+              return errorResult(formatToolError(error, client.configBaseUrl));
+            }
+
+            return tool.execute(id, params);
+          },
+        },
+        opts,
+      );
+    },
+    registerService(service) {
+      api.registerService({
+        ...service,
+        start: async (ctx) => {
+          await ensureStartup(client);
+          await service.start(ctx);
+        },
+      });
+    },
+  };
 }
 
 /**
@@ -131,6 +281,11 @@ export function register(api: PluginAPI): void {
 
   // Create the REST client (stateless — safe to recreate per session)
   const client = new MeshimizeAPI(config);
+  const gatedApi = createStartupGatedApi(api, client);
+
+  void ensureStartup(client).catch(() => {
+    // Startup errors are intentionally deferred to the shared gate.
+  });
 
   // Warn if a subsequent register() call uses a different config than the
   // singletons were initialised with.  The WS service keeps using the first
@@ -171,25 +326,25 @@ export function register(api: PluginAPI): void {
       messageBuffer: sharedMessageBuffer,
       delegationContentBuffer: sharedDelegationBuffer,
     });
-    api.registerService(wsServiceInstance);
+    gatedApi.registerService(wsServiceInstance);
     singletonConfig = config;
   }
 
   // Register group tools (7 tools) — every call
-  registerGroupTools(api, {
+  registerGroupTools(gatedApi, {
     api: client,
     pendingJoins: sharedPendingJoinMap,
     wsService: wsServiceInstance,
   });
 
   // Register messaging tools (4 tools) — every call
-  registerMessageTools(api, { api: client, messageBuffer: sharedMessageBuffer });
+  registerMessageTools(gatedApi, { api: client, messageBuffer: sharedMessageBuffer });
 
   // Register direct message tools (2 tools) — every call
-  registerDirectMessageTools(api, { api: client, messageBuffer: sharedMessageBuffer });
+  registerDirectMessageTools(gatedApi, { api: client, messageBuffer: sharedMessageBuffer });
 
   // Register delegation tools (8 tools) — every call
-  registerDelegationTools(api, { api: client, delegationBuffer: sharedDelegationBuffer });
+  registerDelegationTools(gatedApi, { api: client, delegationBuffer: sharedDelegationBuffer });
 }
 
 /**

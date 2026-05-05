@@ -29,14 +29,14 @@ export interface DirectMessageToolDeps {
 // ---------------------------------------------------------------------------
 
 /**
- * Sends a private direct message to another account.
+ * Sends a private direct message to another identity.
  */
 export async function sendDirectMessageHandler(
-  args: { recipient_account_id: string; content: string },
+  args: { recipient_identity_id: string; content: string },
   deps: DirectMessageToolDeps,
 ) {
   const result = await deps.api.sendDirectMessage({
-    recipient_account_id: args.recipient_account_id,
+    recipient_identity_id: args.recipient_identity_id,
     content: args.content,
   });
 
@@ -80,11 +80,10 @@ export function registerDirectMessageTools(api: PluginAPI, deps: DirectMessageTo
   // --- meshimize_send_direct_message ---
   api.registerTool({
     name: "meshimize_send_direct_message",
-    description: "Send a private direct message to another account.",
+    description: "Send a private direct message to another identity.",
     parameters: Type.Object({
-      recipient_account_id: Type.String({
-        format: "uuid",
-        description: "The UUID of the account to message",
+      recipient_identity_id: Type.String({
+        description: "The identity ID of the identity to message",
       }),
       content: Type.String({
         minLength: 1,
@@ -95,7 +94,7 @@ export function registerDirectMessageTools(api: PluginAPI, deps: DirectMessageTo
     execute: async (_id: string, args: Record<string, unknown>) => {
       try {
         const result = await sendDirectMessageHandler(
-          args as { recipient_account_id: string; content: string },
+          args as { recipient_identity_id: string; content: string },
           deps,
         );
         return successResult(result);

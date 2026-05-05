@@ -55,6 +55,7 @@ describe("MeshimizeAPI", () => {
       wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
     });
     expect(typeof client.getAccount).toBe("function");
+    expect(typeof client.resolveRuntimeIdentity).toBe("function");
     expect(typeof client.searchGroups).toBe("function");
     expect(typeof client.getMyGroups).toBe("function");
     expect(typeof client.joinGroup).toBe("function");
@@ -71,6 +72,96 @@ describe("MeshimizeAPI", () => {
     expect(typeof client.cancelDelegation).toBe("function");
     expect(typeof client.acknowledgeDelegation).toBe("function");
     expect(typeof client.extendDelegation).toBe("function");
+  });
+
+  it("resolves and stores runtime identity from /account", async () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          data: {
+            id: "acct-123",
+            email: "test@example.com",
+            display_name: "Parent Account",
+            description: null,
+            verified: true,
+            current_identity: {
+              id: "identity-123",
+              display_name: "Acting Identity",
+            },
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof fetch;
+
+    try {
+      const result = await client.resolveRuntimeIdentity();
+
+      expect(result).toEqual({
+        account: {
+          id: "acct-123",
+          display_name: "Parent Account",
+          verified: true,
+        },
+        current_identity: {
+          id: "identity-123",
+          display_name: "Acting Identity",
+        },
+      });
+      expect(client.runtimeIdentity).toEqual(result);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("fails explicitly when current_identity is missing", async () => {
+    const client = new MeshimizeAPI({
+      apiKey: "mshz_test",
+      baseUrl: "https://api.meshimize.com",
+      wsUrl: "wss://api.meshimize.com/api/v1/ws/websocket",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          data: {
+            id: "acct-123",
+            email: "test@example.com",
+            display_name: "Parent Account",
+            description: null,
+            verified: true,
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof fetch;
+
+    try {
+      await expect(client.resolveRuntimeIdentity()).rejects.toThrow(
+        "missing or malformed current_identity",
+      );
+      expect(client.runtimeIdentity).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("retries on network failure and succeeds on subsequent attempt", async () => {

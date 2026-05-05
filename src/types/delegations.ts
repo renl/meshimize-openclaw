@@ -24,11 +24,11 @@ export interface Delegation {
   state: DelegationState;
   group_id: string;
   group_name: string;
-  sender_account_id: string;
+  sender_identity_id: string;
   sender_display_name: string;
-  target_account_id: string | null;
+  target_identity_id: string | null;
   target_display_name: string | null;
-  assignee_account_id: string | null;
+  assignee_identity_id: string | null;
   assignee_display_name: string | null;
   description: string | null;
   result: string | null;

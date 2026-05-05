@@ -74,7 +74,7 @@ export async function createDelegationHandler(
   args: {
     group_id: string;
     description: string;
-    target_account_id?: string;
+    target_identity_id?: string;
     ttl_seconds?: number;
   },
   deps: DelegationToolDeps,
@@ -82,15 +82,15 @@ export async function createDelegationHandler(
   const body: {
     group_id: string;
     description: string;
-    target_account_id?: string;
+    target_identity_id?: string;
     ttl_seconds?: number;
   } = {
     group_id: args.group_id,
     description: args.description,
   };
 
-  if (args.target_account_id !== undefined) {
-    body.target_account_id = args.target_account_id;
+  if (args.target_identity_id !== undefined) {
+    body.target_identity_id = args.target_identity_id;
   }
   if (args.ttl_seconds !== undefined) {
     body.ttl_seconds = args.ttl_seconds;
@@ -222,7 +222,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
   api.registerTool({
     name: "meshimize_create_delegation",
     description:
-      "Create a new delegation in a group. The sender is automatically set to the authenticated account. The description is persisted server-side with lifecycle-tied cleanup (purged on acknowledge or TTL expiry).",
+      "Create a new delegation in a group. The sender is automatically set to the authenticated identity. The description is persisted server-side with lifecycle-tied cleanup (purged on acknowledge or TTL expiry).",
     parameters: Type.Object({
       group_id: Type.String({
         format: "uuid",
@@ -233,10 +233,9 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
         maxLength: 32000,
         description: "Description of the delegated task",
       }),
-      target_account_id: Type.Optional(
+      target_identity_id: Type.Optional(
         Type.String({
-          format: "uuid",
-          description: "Optional UUID of the target account to assign the delegation to",
+          description: "Optional identity ID of the target identity to assign the delegation to",
         }),
       ),
       ttl_seconds: Type.Optional(
@@ -253,7 +252,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
           args as {
             group_id: string;
             description: string;
-            target_account_id?: string;
+            target_identity_id?: string;
             ttl_seconds?: number;
           },
           deps,
@@ -292,7 +291,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
       ),
       role: Type.Optional(
         Type.Union([Type.Literal("sender"), Type.Literal("assignee"), Type.Literal("available")], {
-          description: "Filter by role relative to the authenticated account",
+          description: "Filter by role relative to the authenticated identity",
         }),
       ),
       limit: Type.Optional(
@@ -354,7 +353,7 @@ export function registerDelegationTools(api: PluginAPI, deps: DelegationToolDeps
   api.registerTool({
     name: "meshimize_accept_delegation",
     description:
-      "Accept a pending delegation. Only the target account (if set) or any group member (if no target) can accept.",
+      "Accept a pending delegation. Only the target identity (if set) or any group member (if no target) can accept.",
     parameters: Type.Object({
       delegation_id: Type.String({
         format: "uuid",
