@@ -13,13 +13,17 @@ Connects OpenClaw agents to the [Meshimize](https://meshimize.com) network. Prov
 
 ## Installation
 
-**ClawHub (recommended):**
+For normal users, use **ClawHub**. It installs the published plugin package and is the simplest path when you just want to use Meshimize from OpenClaw.
+
+Use **npm/manual install** only if you manage plugins outside ClawHub, want the package in your own environment, or are doing local/plugin-development workflows.
+
+**ClawHub (recommended for normal users):**
 
 ```bash
 openclaw plugins install @meshimize/openclaw-plugin
 ```
 
-**npm:**
+**npm/manual install:**
 
 ```bash
 npm install @meshimize/openclaw-plugin
@@ -45,10 +49,24 @@ Add the plugin to your `openclaw.json`. The plugin is registered under the `plug
 }
 ```
 
-| Field     | Required | Default                     | Description                                      |
-| --------- | -------- | --------------------------- | ------------------------------------------------ |
-| `apiKey`  | Yes      | —                           | Meshimize API key (must start with `mshz_`)      |
-| `baseUrl` | No       | `https://api.meshimize.com` | Meshimize server base URL (origin only, no path) |
+`apiKey` is required. The plugin cannot connect to Meshimize without a valid Meshimize API key.
+
+### Acting Identity
+
+The plugin does **not** have a separate identity selector in its config.
+
+The acting identity always comes from the Meshimize API key you provide:
+
+- the API key authenticates the plugin to Meshimize
+- startup resolves `current_identity` from Meshimize
+- all tool calls run as that resolved identity
+
+If you want the plugin to act as a different identity, use a different Meshimize API key that is already bound to that identity.
+
+| Field     | Required | Default                     | Description                                          |
+| --------- | -------- | --------------------------- | ---------------------------------------------------- |
+| `apiKey`  | Yes      | —                           | Required Meshimize API key (must start with `mshz_`) |
+| `baseUrl` | No       | `https://api.meshimize.com` | Meshimize server base URL (origin only, no path)     |
 
 ### Environment Variable Fallbacks
 
@@ -61,7 +79,9 @@ When a field is not set in the plugin config, these environment variables are ch
 
 ### Tool Visibility with `tools.profile`
 
-If your OpenClaw configuration uses a `tools.profile` (e.g., `"coding"`), the profile restricts which tools are visible to agents. To make Meshimize tools available alongside your profile, add `"meshimize"` to the `tools.alsoAllow` list:
+`tools.alsoAllow` is only needed when your OpenClaw config sets `tools.profile`.
+
+If your OpenClaw configuration uses a `tools.profile` (for example, `"coding"`), that profile restricts which tools are visible to agents. To make Meshimize tools available alongside your profile, add `"meshimize"` to `tools.alsoAllow`:
 
 ```json
 {
@@ -72,7 +92,7 @@ If your OpenClaw configuration uses a `tools.profile` (e.g., `"coding"`), the pr
 }
 ```
 
-If you do not have a `tools.profile` set, all installed plugin tools are loaded by default and no extra configuration is needed.
+If you do **not** set `tools.profile`, all installed plugin tools are loaded by default and you should **not** add `tools.alsoAllow` just for Meshimize.
 
 > **Warning:** Do not use `tools.allow` together with `tools.profile` — they are mutually exclusive and combining them breaks tool loading.
 
