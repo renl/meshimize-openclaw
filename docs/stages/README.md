@@ -1,5 +1,21 @@
 # OpenClaw04 test-environment preparation
 
+## 04u correction1 — review packet (supersedes earlier04u planning)
+
+Shared receiver/safety source6fdf93c; main unchanged1e7ee434. Approved **available immutable chain**, not helper-merge wait:
+
+| Spec                                                             | Path / branch / change / owner / status                                                                                    | Baseline / next action / cleanup evidence                                                                                                                                                                                                      |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Contract fixture](private-owner-join-04u-contract-fixture.md)   | `.worktree/private-owner-join-04u-contract-fixture` / same / preserved RED fixtures / SDET / active                        | 6fdf93c→441f665;369lines/6files. Retain as pinned input; no removal/landing claim.                                                                                                                                                             |
+| [Private proof setup](private-owner-join-04u-private-fixture.md) | `.worktree/private-owner-join-04u-private-fixture` / same / runnable postimplementation proof / SDET / active              | 441f665→610789c;511lines/5files. Syntax fixturePASS99acbe8f; fresh regression322PASS5ad74057, cleanupPASS. Existing public8 hash-revalidated33/33+tarball, not reexecuted cleanly. Retain until landing/promotion.                             |
+| [Functional04u](private-owner-join-04u-known-pending.md)         | `.worktree/private-owner-join-04u-known-pending` / same / nullable+registration isolation / SDET / active, review required | baseline610789c; full eleven tests activated plus physical request negatives. CoS→Architect review entire packet before SE. Private setup review BEFORE postimplementation execution; no privatePASS prerequisite. No cleanup eligibility yet. |
+
+No tests dropped; `.contract.ts` fixtures intentionally excluded from helper default322 and activated by functional `.test.ts` wrappers. Explicit pending RED is not helperGREEN. Final run/count/size evidence in functional brief. Old receiver/safety suites not rerun without source drift. Capacity failures ddc93465/1d62e887 are not clean gates; final targeted checks use verified unchanged artifact with read-only dependencies/disposable tmpfs and preserve4GiB floor. No production edits, PR/publication/deploy/promotion.
+
+04u [private-proof fixture](private-owner-join-04u-private-fixture.md): `.worktree/private-owner-join-04u-private-fixture` / same branch / runnable private proof setup / SDET / active; prerequisite441f665. Next: review runnable setup before postimplementation execution, pin functional chain. Cleanup: retained; not landed/abandoned. No private PASS claim.
+
+04u correction1 adds [immutable contract fixture](private-owner-join-04u-contract-fixture.md), path/branch `.worktree/private-owner-join-04u-contract-fixture` / same; change=test-only contracts; owner=SDET; status=active; baseline6fdf93c. Next: pin tested helper then private-proof fixture and functional chain for Architect review. Cleanup: retain; not landed/abandoned. No helper merge wait or main promotion.
+
 ## Receiver partition (approved available immutable chain; narrow Architect review pending)
 
 Independent combined verification at51c27cb: receiver9 (04caae32), safety13 (f57d1b7a), regression322 (b7e435f4), installed public8 (53641701), all assertions/cleanup PASS. Fixture pin a793f11 standalone integrity/regression322/public8 PASS; details in functional brief. No full private-workflow or release-ready claim; CoS narrow Architect partition/plugin review still required before SE git-only PR handoffs.

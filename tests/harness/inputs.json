@@ -17,6 +17,28 @@
       }
     ],
     "regression": [],
+    "pending": [],
+    "pending-wire": [
+      {
+        "path": "tests/harness/pending-wire.mjs",
+        "target": "pending-wire.mjs",
+        "sha256": "c6889134edb493d7b9873d1bacfa43bc3209be43f373be7e5700c059f823fb95"
+      }
+    ],
+    "private-owner": [
+      {
+        "path": "tests/harness/private-workflow.mjs",
+        "target": "private-workflow.mjs",
+        "sha256": "61b8cbf2251c28c20801cda8f2fa2a5c2fd60e5feea49bd2017a9195b4bd40e9"
+      }
+    ],
+    "private-invited": [
+      {
+        "path": "tests/harness/private-workflow.mjs",
+        "target": "private-workflow.mjs",
+        "sha256": "61b8cbf2251c28c20801cda8f2fa2a5c2fd60e5feea49bd2017a9195b4bd40e9"
+      }
+    ],
     "wire": [
       {
         "path": "tests/harness/wire.mjs",
