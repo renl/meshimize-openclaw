@@ -157,7 +157,14 @@ try {
       throw Error("reuse artifact drift");
     cpSync(join(old, "dist"), join(candidate, "dist"), { recursive: true });
     cpSync(join(old, tar), join(candidate, tar));
-    dependencyMount = ["-v", `${join(old, "node_modules")}:/proof/candidate/node_modules:ro`];
+    dependencyMount = [
+      "-v",
+      `${join(old, "node_modules")}:/proof/candidate/node_modules:ro`,
+      "--tmpfs",
+      "/proof/candidate/node_modules/.vite-temp",
+      "--tmpfs",
+      "/proof/candidate/node_modules/.vite",
+    ];
     evidence.reusedBuild = {
       run: prior.run,
       artifactSHA256: prior.artifactSHA256,
