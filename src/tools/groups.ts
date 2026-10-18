@@ -288,6 +288,47 @@ function uncertainError(pending: PendingJoinRequest, detail: string): JoinWriteE
 }
 
 /**
+ * Bounded receiver-readiness window measured from the successful join write.
+ * The accepted membership is already durable; this only bounds how long the
+ * caller waits before it is told the truth about delivery.
+ */
+const RECEIVER_READY_WINDOW_MS = 10_000;
+
+type ReceiverProbe = {
+  isReceiverReady: (groupId: string) => boolean;
+  awaitReceiverReady: (
+    groupId: string,
+    timeoutMs: number,
+  ) => Promise<{ ready: boolean; reason?: string }>;
+};
+
+/**
+ * Returns the service's explicit readiness gate, when the wired service exposes
+ * one. Older best-effort wirings (unit-level callers) are reported ready, which
+ * is exactly the pre-§4.4.1 behaviour; the plugin always wires the gate.
+ */
+function receiverProbe(wsService: WsService): ReceiverProbe | null {
+  const candidate = wsService as Partial<ReceiverProbe>;
+  return typeof candidate.awaitReceiverReady === "function" &&
+    typeof candidate.isReceiverReady === "function"
+    ? (candidate as ReceiverProbe)
+    : null;
+}
+
+/** Waits for truthful delivery readiness within the bounded window. */
+async function awaitReceiver(
+  deps: GroupToolDeps,
+  groupId: string,
+): Promise<{ ready: boolean; reason?: string }> {
+  const probe = receiverProbe(deps.wsService);
+  if (!probe) {
+    await deps.wsService.subscribeToGroup(groupId);
+    return { ready: true };
+  }
+  return probe.awaitReceiverReady(groupId, RECEIVER_READY_WINDOW_MS);
+}
+
+/**
  * Emits the one approved join write and applies the outcome partition.
  */
 async function performJoinWrite(deps: GroupToolDeps, pending: PendingJoinRequest) {
@@ -315,15 +356,33 @@ async function performJoinWrite(deps: GroupToolDeps, pending: PendingJoinRequest
 
   deps.pendingJoins.remove(pending.group_id);
 
-  // OpenClaw-specific: explicitly subscribe to the group WS channel
-  // after successful REST join (architecture §4.4 step 3a).
-  await deps.wsService.subscribeToGroup(pending.group_id);
+  // OpenClaw-specific: the accepted membership is not a delivery claim. Only an
+  // acknowledged group channel on the live socket, with its shared-buffer
+  // handler attached, may be reported ready (architecture §4.4.1 step 3a).
+  const readiness = await awaitReceiver(deps, pending.group_id);
+
+  if (!readiness.ready) {
+    return {
+      group_id: data.group_id,
+      joined: true,
+      role: data.role,
+      membership_path_ready: null,
+      receiver: { ready: false, reason: readiness.reason },
+      message:
+        `You are a confirmed ${data.role} of ${describeJoinTarget(pending)}, but this client has ` +
+        `no acknowledged receiver for this group (${readiness.reason}). A question posted now could ` +
+        "not be answered here. Do not retry or replay `meshimize_approve_join` — the membership " +
+        "write already succeeded. Call `meshimize_list_my_groups` to confirm the membership, and " +
+        "ask your operator to restart/reconnect this client before asking a question.",
+    };
+  }
 
   return {
     group_id: data.group_id,
     joined: true,
     membership_path_ready: "post_approval_first_ask",
     role: data.role,
+    receiver: { ready: true },
   };
 }
 

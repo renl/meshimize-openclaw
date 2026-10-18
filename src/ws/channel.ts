@@ -26,6 +26,7 @@ export class Channel {
   private socket: SocketAdapter;
   private state: ChannelState = "closed";
   private joinRef: string | null = null;
+  private joinPromise: Promise<Record<string, unknown>> | null = null;
   private eventHandlers: Map<string, Array<(payload: unknown) => void>> = new Map();
 
   constructor(topic: string, socket: SocketAdapter) {
@@ -40,7 +41,27 @@ export class Channel {
   }
 
   /** Join the channel — sends phx_join, returns promise that resolves on ok reply. */
-  async join(): Promise<Record<string, unknown>> {
+  join(): Promise<Record<string, unknown>> {
+    const pending = this.performJoin();
+    this.joinPromise = pending;
+    const clear = (): void => {
+      if (this.joinPromise === pending) this.joinPromise = null;
+    };
+    void pending.then(clear, clear);
+    return pending;
+  }
+
+  /**
+   * The join acknowledgement this channel is currently waiting for, if a join is
+   * in flight. Lets a caller coalesce with a join it did not start itself
+   * (for example the socket's own post-reconnect re-join) instead of sending a
+   * second physical phx_join for the same topic.
+   */
+  pendingJoin(): Promise<Record<string, unknown>> | null {
+    return this.state === "joining" ? this.joinPromise : null;
+  }
+
+  private async performJoin(): Promise<Record<string, unknown>> {
     if (this.state === "joining" || this.state === "joined") {
       throw new Error(`Channel "${this.topic}" is already ${this.state}`);
     }
