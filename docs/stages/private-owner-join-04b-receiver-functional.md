@@ -26,3 +26,16 @@ Contract/source cross-check inherited from original reviewed packet: root OpenCl
 Fixture prerequisite a793f11: `meshimize-oc04-e77a9836` fixture PASS, `793366cc` regression322 PASS, `d25d0268` installed public8 PASS; all cleanup PASS. Evidence under root `_build/sdet-local/openclaw04/runs/`. Combined candidate freshly executes exact receiver fixture; bind production/dependency hashes to45686cc and report four fresh gates separately. Monitor Docker approximately4GiB free; no prune/resize; inherited bounded start/readiness/test/log/teardown/inspection. Loopback receiver proof is not real private eligibility; installed public8 exercises actual Gateway,21 tools, identity receiver and correlated useful public answer. Private owner/invitee combined workflow and guides remain pending.
 
 Next: CoS narrow Architect review, then two SE git-only persistence/push/PR handoffs; no further production edits. Worktree cleanup pending verified landing/promotion; harness cleanup separate from worktree removal.
+
+### Independent partition verification
+
+Executed on immutable candidate `51c27cbd034b6658dd85e0d5cff6795ecf10df6e`; subsequent evidence-only brief/index edits do not change harness inputs, runtime source, dependencies or packaged inputs. Artifact SHA256 `3a2a6d5d01ae64fa389fdeb4a528d97e1bc39f063d4df4bb4a57963c1dc96482` identical across all four fresh runs.
+
+| Gate                                               | Run (prefix meshimize-oc04-) | Assertions             | Cleanup |
+| -------------------------------------------------- | ---------------------------- | ---------------------- | ------- |
+| Receiver, all lifecycle/deadline negatives         | 04caae32                     | 9/9 PASS, zero skipped | PASS    |
+| Physical single-write/error safety                 | f57d1b7a                     | 13/13 PASS             | PASS    |
+| Format/typecheck/lint/build + existing regressions | b7e435f4                     | 322/322 PASS           | PASS    |
+| Actual installed Gateway/public Q&A                | 53641701                     | 8/8 checkpoints PASS   | PASS    |
+
+Entire `src`, package/lock/plugin manifest and receiver fixture equal45686cc by Git object comparison plus physical fixture hash. All28 unit pins verified by prerequisite fixture mode; not freshly executed and not claimed28 GREEN. Prerequisite artifact `b326bbd7d34e9b9f5cc0dc715d8b99b151be41911263f77464cb299f2f2735c4`; regression322 and installed8 independently PASS on uncorrected base. Docker before each gate4,225,772KiB (first fixture4,225,780); lowest observed4,096,104KiB during installed baseline (~3.91GiB), all owned run resources removed; no prune/resize. Worktrees remain active, not removed. Full feature verification/release readiness NOT claimed.
