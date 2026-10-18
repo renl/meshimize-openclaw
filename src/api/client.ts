@@ -88,13 +88,20 @@ export class MeshimizeAPI {
     this._runtimeIdentity = context;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options?: { attempts?: number },
+  ): Promise<T> {
     // Fast-fail if key is known to be invalid
     if (this._invalidKey) {
       throw new MeshimizeAPIError(401, { error: "Invalid or expired API key" });
     }
 
-    const maxAttempts = 3;
+    // Read requests and unrelated writes inherit the default retry budget.
+    // Single-write operations pass `attempts: 1` so at most one request is emitted.
+    const maxAttempts = options?.attempts ?? 3;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const headers: Record<string, string> = {
@@ -239,7 +246,9 @@ export class MeshimizeAPI {
   }
 
   async joinGroup(groupId: string): Promise<{ data: GroupJoinResponse }> {
-    return this.request("POST", `/groups/${groupId}/join`);
+    // Operator-approved join is a single-write operation (OpenClaw §4.4.1 steps 2):
+    // one physical POST, no request-layer retry on 429 or transport failure.
+    return this.request("POST", `/groups/${groupId}/join`, undefined, { attempts: 1 });
   }
 
   async leaveGroup(groupId: string): Promise<void> {

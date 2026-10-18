@@ -17,11 +17,13 @@
 
 import { Type } from "@sinclair/typebox";
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
+import { MeshimizeAPIError } from "../api/client.js";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { PendingJoinMap } from "../state/pending-joins.js";
+import type { PendingJoinRequest } from "../types/pending-joins.js";
 import type { WsService } from "../services/ws-manager.js";
-import type { GroupResponse } from "../types/groups.js";
-import { successResult, errorResult, formatToolError } from "../errors.js";
+import type { GroupJoinResponse, GroupResponse } from "../types/groups.js";
+import { successResult, errorResult, formatToolError, JoinWriteError } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies interface
@@ -215,32 +217,144 @@ export async function joinGroupHandler(args: { group_id: string }, deps: GroupTo
   };
 }
 
+// ---------------------------------------------------------------------------
+// Single-write attempt ownership and join outcome guidance (OpenClaw §4.4.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Group IDs with a join write currently in flight, keyed by the pending-join
+ * store that owns the request. One identity's in-flight attempt therefore never
+ * blocks another identity's store, and concurrent approvals of the same pending
+ * request share a single physical POST.
+ */
+const joinWritesInFlight = new WeakMap<object, Set<string>>();
+
+function claimJoinWrite(store: object, groupId: string): boolean {
+  const active = joinWritesInFlight.get(store) ?? new Set<string>();
+  joinWritesInFlight.set(store, active);
+  if (active.has(groupId)) return false;
+  active.add(groupId);
+  return true;
+}
+
+function releaseJoinWrite(store: object, groupId: string): void {
+  joinWritesInFlight.get(store)?.delete(groupId);
+}
+
+function describeJoinTarget(pending: PendingJoinRequest): string {
+  return `group "${pending.group_name}" (${pending.group_id})`;
+}
+
+function describeJoinFailure(error: unknown): string {
+  if (error instanceof MeshimizeAPIError) return `HTTP ${error.status}: ${error.message}`;
+  if (error instanceof Error) return error.message;
+  return "unrecognized failure";
+}
+
+/** 4xx responses (except a request timeout) prove the write was not applied. */
+function isDefinitiveRefusal(error: unknown): error is MeshimizeAPIError {
+  return (
+    error instanceof MeshimizeAPIError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 408
+  );
+}
+
+/**
+ * Refusal guidance: the identity-scoped write definitely did not happen, so the
+ * operator-approved request is retained untouched for a fresh explicit approval.
+ */
+function refusalError(pending: PendingJoinRequest, error: unknown): JoinWriteError {
+  return new JoinWriteError(
+    `Join write for ${describeJoinTarget(pending)} was refused (${describeJoinFailure(error)}). ` +
+      `The pending request ${pending.id} is unchanged and still expires at ${pending.expires_at}. ` +
+      "Ask your operator for fresh explicit approval before calling `meshimize_approve_join` again — " +
+      "there is no automatic retry, and this tool will not replay the write.",
+  );
+}
+
+/**
+ * Uncertainty guidance: the write may have been applied, so the replayable
+ * pending request is cleared and the agent is pointed at a read-only check.
+ */
+function uncertainError(pending: PendingJoinRequest, detail: string): JoinWriteError {
+  return new JoinWriteError(
+    `Join write for ${describeJoinTarget(pending)} has an uncertain outcome; you might already be a ` +
+      `member (${detail}). The pending request was cleared and will not be replayed. ` +
+      "Do not retry the write — call `meshimize_list_my_groups` to check whether the membership now " +
+      "exists, then ask your operator again only if it does not.",
+  );
+}
+
+/**
+ * Emits the one approved join write and applies the outcome partition.
+ */
+async function performJoinWrite(deps: GroupToolDeps, pending: PendingJoinRequest) {
+  let joined: { data: GroupJoinResponse };
+
+  try {
+    joined = await deps.api.joinGroup(pending.group_id);
+  } catch (error) {
+    if (isDefinitiveRefusal(error)) {
+      // Pending state (including ID and expiry) is retained verbatim.
+      throw refusalError(pending, error);
+    }
+    // Server error, request timeout, transport loss: membership may exist.
+    deps.pendingJoins.remove(pending.group_id);
+    throw uncertainError(pending, describeJoinFailure(error));
+  }
+
+  const data = joined?.data;
+
+  if (!data || typeof data.group_id !== "string" || data.group_id.length === 0) {
+    // An unusable 2xx cannot prove membership, so it is not treated as success.
+    deps.pendingJoins.remove(pending.group_id);
+    throw uncertainError(pending, "the server reply carried no usable membership");
+  }
+
+  deps.pendingJoins.remove(pending.group_id);
+
+  // OpenClaw-specific: explicitly subscribe to the group WS channel
+  // after successful REST join (architecture §4.4 step 3a).
+  await deps.wsService.subscribeToGroup(pending.group_id);
+
+  return {
+    group_id: data.group_id,
+    joined: true,
+    membership_path_ready: "post_approval_first_ask",
+    role: data.role,
+  };
+}
+
 /**
  * Completes a pending join after operator approval.
- * Calls POST /groups/:group_id/join and subscribes to the WS channel.
+ * Calls POST /groups/:group_id/join at most once and subscribes to the WS
+ * channel only after a confirmed membership.
  */
 export async function approveJoinHandler(args: { group_id: string }, deps: GroupToolDeps) {
-  if (!deps.pendingJoins.getByGroupId(args.group_id)) {
+  const pending = deps.pendingJoins.getByGroupId(args.group_id);
+
+  if (!pending) {
     throw new Error(
       "No pending join request found for this group. " +
         "Call `meshimize_join_group` first to create a request, then get operator approval.",
     );
   }
 
-  const result = await deps.api.joinGroup(args.group_id);
+  if (!claimJoinWrite(deps.pendingJoins, pending.group_id)) {
+    throw new JoinWriteError(
+      `A join write for ${describeJoinTarget(pending)} is already in progress. ` +
+        "Do not retry it; wait for that attempt to finish, then check " +
+        "`meshimize_list_pending_joins` and `meshimize_list_my_groups` before acting again.",
+    );
+  }
 
-  deps.pendingJoins.remove(args.group_id);
-
-  // OpenClaw-specific: explicitly subscribe to the group WS channel
-  // after successful REST join (architecture §4.4 step 3a).
-  await deps.wsService.subscribeToGroup(args.group_id);
-
-  return {
-    group_id: result.data.group_id,
-    joined: true,
-    membership_path_ready: "post_approval_first_ask",
-    role: result.data.role,
-  };
+  try {
+    return await performJoinWrite(deps, pending);
+  } finally {
+    releaseJoinWrite(deps.pendingJoins, pending.group_id);
+  }
 }
 
 /**

@@ -117,6 +117,9 @@ try {
     "README.md",
     "LICENSE",
     "meshimize",
+    ".gitignore",
+    ".prettierrc",
+    ".eslintrc.cjs",
   ])
     cpSync(join(source, p), join(candidate, p), { recursive: true });
   hashTree(candidate, "candidate");
@@ -166,18 +169,26 @@ try {
       "-w",
       "/proof/candidate",
       runtime,
-      "node",
-      "node_modules/vitest/vitest.mjs",
-      "run",
-      ...(mode === "units"
+      ...(mode === "regression"
         ? [
-            "tests/tools/private-known-id.test.ts",
-            "tests/api/join-single-attempt.test.ts",
-            "tests/identity-pending.test.ts",
-            "tests/services/private-receiver.test.ts",
+            "sh",
+            "-c",
+            "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build",
           ]
-        : []),
-      "--reporter=verbose",
+        : [
+            "node",
+            "node_modules/vitest/vitest.mjs",
+            "run",
+            ...(mode === "units"
+              ? [
+                  "tests/tools/private-known-id.test.ts",
+                  "tests/api/join-single-attempt.test.ts",
+                  "tests/identity-pending.test.ts",
+                  "tests/services/private-receiver.test.ts",
+                ]
+              : []),
+            "--reporter=verbose",
+          ]),
     ]);
     const r = docker(["start", "-a", test], 90, true);
     writeFileSync(join(out, "units.log"), r.text);
@@ -193,7 +204,7 @@ try {
       `/proof/${mode}.mjs`,
     ]);
     const r = docker(["start", "-a", test], 90, true);
-    writeFileSync(join(out, "wire.log"), r.text);
+    writeFileSync(join(out, `${mode}.log`), r.text);
     evidence.assertion = r.ok ? "PASS" : "FAIL";
   } else {
     network = true;
