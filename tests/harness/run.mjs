@@ -193,7 +193,7 @@ try {
     const r = docker(["start", "-a", test], 90, true);
     writeFileSync(join(out, "units.log"), r.text);
     evidence.assertion = r.ok ? "PASS" : "FAIL";
-  } else if (["wire", "safety"].includes(mode)) {
+  } else if (["wire", "safety", "receiver"].includes(mode)) {
     const test = create("wire", [
       "--network=none",
       "-v",

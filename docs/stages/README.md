@@ -1,5 +1,11 @@
 # OpenClaw04 test-environment preparation
 
+## Receiver04b current packet — Architect review required
+
+| Spec / prerequisite                                                                        | Path / branch / change / owner / status                                                                                                                                   | Next action / cleanup evidence                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Receiver04b](private-owner-join-04b-receiver-chain.md); authorized available chain748768d | `repos/meshimize-openclaw/.worktree/private-owner-join-04b-receiver-chain` / `private-owner-join-04b-receiver-chain` / current receiver / SDET / active, materialized RED | CoS→Architect updated boundary/decomposition review; SE only after approval. Physical9 expectedRED/cleanupPASS; final runs/budget root04b-result.json. No landing/removal; full private proof deferred. |
+
 ## Active implementation handoff
 
 | Spec / baseline                                                                      | Path / branch / change / owner / status                                                                                                                                        | Next action / cleanup evidence                                                                                                                                                                          |
