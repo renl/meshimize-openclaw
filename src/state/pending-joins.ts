@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { PendingJoinRequest } from "../types/pending-joins.js";
+import type { GroupType, PendingJoinRequest } from "../types/pending-joins.js";
 
 /**
  * Configuration subset required by PendingJoinMap.
@@ -16,17 +16,21 @@ export const PENDING_JOIN_DEFAULTS: PendingJoinConfig = {
   maxPendingJoins: 50,
 };
 
-interface PendingJoinGroupInput {
-  id: string;
-  name: string;
-  description: string | null;
-  type: PendingJoinRequest["group_type"];
-  owner: {
-    id: string;
-    display_name: string;
-    verified: boolean;
-  };
-}
+/**
+ * Input accepted by PendingJoinMap.add(). Public discovery supplies describable
+ * metadata; an operator-supplied ID that discovery did not confirm supplies only the
+ * ID and marks itself unknown, so no descriptive value is ever invented.
+ */
+export type PendingJoinGroupInput =
+  | {
+      id: string;
+      name: string;
+      description: string | null;
+      type: GroupType;
+      owner: { id: string; display_name: string; verified: boolean };
+      metadataSource?: "public_discovery";
+    }
+  | { id: string; metadataSource: "unknown" };
 
 export interface PendingJoinMap {
   add(group: PendingJoinGroupInput): PendingJoinRequest;
@@ -92,17 +96,33 @@ class PendingJoinMapImpl implements PendingJoinMap {
     }
 
     const now = Date.now();
+    const timing = {
+      created_at: new Date(now).toISOString(),
+      expires_at: new Date(now + this.joinTimeoutMs).toISOString(),
+    };
     const request: PendingJoinRequest = {
       id: crypto.randomUUID(),
       group_id: group.id,
-      group_name: group.name,
-      group_type: group.type,
-      group_description: group.description,
-      owner_account_id: group.owner.id,
-      owner_display_name: group.owner.display_name,
-      owner_verified: group.owner.verified,
-      created_at: new Date(now).toISOString(),
-      expires_at: new Date(now + this.joinTimeoutMs).toISOString(),
+      ...(group.metadataSource === "unknown"
+        ? {
+            metadata_source: "unknown" as const,
+            group_name: null,
+            group_type: null,
+            group_description: null,
+            owner_account_id: null,
+            owner_display_name: null,
+            owner_verified: null,
+          }
+        : {
+            metadata_source: "public_discovery" as const,
+            group_name: group.name,
+            group_type: group.type,
+            group_description: group.description,
+            owner_account_id: group.owner.id,
+            owner_display_name: group.owner.display_name,
+            owner_verified: group.owner.verified,
+          }),
+      ...timing,
     };
 
     const frozen = Object.freeze(request);
