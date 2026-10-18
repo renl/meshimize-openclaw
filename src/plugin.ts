@@ -338,7 +338,11 @@ export function register(api: PluginAPI): void {
   });
 
   // Register messaging tools (4 tools) — every call
-  registerMessageTools(gatedApi, { api: client, messageBuffer: sharedMessageBuffer });
+  registerMessageTools(gatedApi, {
+    api: client,
+    messageBuffer: sharedMessageBuffer,
+    wsService: wsServiceInstance,
+  });
 
   // Register direct message tools (2 tools) — every call
   registerDirectMessageTools(gatedApi, { api: client, messageBuffer: sharedMessageBuffer });

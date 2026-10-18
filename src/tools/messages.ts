@@ -16,6 +16,7 @@ import { Type } from "@sinclair/typebox";
 import type { PluginAPI } from "openclaw/plugin-sdk/types";
 import type { MeshimizeAPI } from "../api/client.js";
 import type { MessageBuffer } from "../buffer/message-buffer.js";
+import type { WsService } from "../services/ws-manager.js";
 import { findMyGroupById } from "./groups.js";
 import { successResult, errorResult, formatToolError } from "../errors.js";
 
@@ -26,6 +27,11 @@ import { successResult, errorResult, formatToolError } from "../errors.js";
 export interface MessageToolDeps {
   api: MeshimizeAPI;
   messageBuffer: MessageBuffer;
+  /**
+   * Receiver readiness gate. When wired (the plugin always wires it), a question
+   * is only posted while this client still has an acknowledged group receiver.
+   */
+  wsService?: WsService;
 }
 
 // ---------------------------------------------------------------------------
@@ -34,6 +40,17 @@ export interface MessageToolDeps {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Message that explains a refused ask without inviting a membership write. */
+function deliveryNotReady(groupId: string): Error {
+  return new Error(
+    `Delivery is not ready for group ${groupId}: this client has no acknowledged group ` +
+      "receiver, so a question posted now could not receive its answer. Do not re-run " +
+      "`meshimize_join_group` or `meshimize_approve_join` — the membership write is not the " +
+      "problem. Call `meshimize_list_my_groups` to confirm membership, reconnect this client, " +
+      "then ask again.",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -109,11 +126,23 @@ export async function askQuestionHandler(
     throw new Error("`meshimize_ask_question` is only valid for Q&A groups.");
   }
 
-  // 3. Set timeout
+  // 3. Never post a question this client cannot currently hear the answer to.
+  //    Registered tools always wire the readiness gate; a handler used without a
+  //    receiver service keeps its legacy post-and-wait behaviour.
+  const wsService = deps.wsService;
+  if (
+    wsService &&
+    typeof wsService.isReceiverReady === "function" &&
+    !wsService.isReceiverReady(args.group_id)
+  ) {
+    throw deliveryNotReady(args.group_id);
+  }
+
+  // 4. Set timeout
   const timeoutSeconds = args.timeout_seconds ?? 90;
   const timeoutMs = timeoutSeconds * 1000;
 
-  // 4. Post question
+  // 5. Post question
   const questionResult = await deps.api.postMessage(args.group_id, {
     content: args.question,
     message_type: "question",
@@ -121,7 +150,7 @@ export async function askQuestionHandler(
   });
   const questionId = questionResult.data.id;
 
-  // 5. Poll loop
+  // 6. Poll loop
   const pollInterval = 500;
   const startTime = Date.now();
 

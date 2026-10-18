@@ -31,21 +31,49 @@ export interface WsManagerDeps {
 }
 
 /**
+ * Truthful delivery readiness for one group. `ready` is only reported after the
+ * server acknowledged the group channel on the live socket and the shared-buffer
+ * handler is attached; every later disconnect, phx_error or phx_close invalidates it.
+ */
+export interface ReceiverReadiness {
+  ready: boolean;
+  reason?: string;
+}
+
+/** Readiness probe plus the bounded wait window a caller may rely on. */
+export interface ReceiverGate {
+  isReceiverReady: (groupId: string) => boolean;
+  awaitReceiverReady: (groupId: string, timeoutMs: number) => Promise<ReceiverReadiness>;
+}
+
+/**
  * Extended service type that exposes internal methods for tool implementations.
  * Tools (Slice 4+) call subscribeToGroup/unsubscribeFromGroup when the agent joins/leaves groups.
  */
-export interface WsService extends OpenClawPluginService {
+export interface WsService extends OpenClawPluginService, ReceiverGate {
   subscribeToGroup: (groupId: string) => Promise<void>;
   unsubscribeFromGroup: (groupId: string) => Promise<void>;
   getSocket: () => PhoenixSocket | null;
+}
+
+/** One bounded attempt to own a group's delivered messages on one socket. */
+interface GroupReceiver {
+  groupId: string;
+  socket: PhoenixSocket;
+  channel: Channel;
+  handler: ((payload: unknown) => void) | null;
+  lifecycle: ((payload: unknown) => void) | null;
+  ready: boolean;
+  done: boolean;
+  settled: Promise<void>;
+  settle: () => void;
 }
 
 export function createWsService(deps: WsManagerDeps): WsService {
   const { config, api, messageBuffer, delegationContentBuffer } = deps;
 
   let socket: PhoenixSocket | null = null;
-  const groupChannels: Map<string, Channel> = new Map();
-  const groupMessageHandlers: Map<string, (payload: unknown) => void> = new Map();
+  const receivers: Map<string, GroupReceiver> = new Map();
   // Retained for future tool slice use (Slice 4+: DM tools may need to access it)
   let _identityChannel: Channel | null = null;
   // Account channel handler references — stored for cleanup on reconnect (Issue A)
@@ -87,7 +115,12 @@ export function createWsService(deps: WsManagerDeps): WsService {
     let subscriptionTriggered = false;
 
     socket.onStateChange = (state) => {
-      if (state !== "connected") return;
+      if (state !== "connected") {
+        // Any disconnect/reconnect invalidates every delivery claim: a receiver is
+        // only truthful for the socket that acked it.
+        invalidateReceivers();
+        return;
+      }
 
       // Skip the first successful connection — handled by the post-connect block below.
       // subscriptionTriggered is false until either: (a) post-connect sets it after
@@ -205,67 +238,208 @@ export function createWsService(deps: WsManagerDeps): WsService {
     }
   }
 
-  async function subscribeToGroup(groupId: string): Promise<void> {
-    if (!socket || socket.getState() !== "connected") return;
+  /**
+   * Escalates a group to a truthful receiver: resolves only once the current
+   * socket has an acknowledged group channel and the shared-buffer handler is
+   * attached. It never throws — callers must confirm with `isReceiverReady`
+   * instead of assuming that resolution means delivery.
+   */
+  function subscribeToGroup(groupId: string): Promise<void> {
+    const current = socket;
+    if (!current || current.getState() !== "connected") return Promise.resolve();
 
-    // Issue B: Check existing channel state — only skip if genuinely joined
-    const existingCh = groupChannels.get(groupId);
-    if (existingCh) {
-      if (existingCh.getState() === "joined") return;
-
-      // Channel exists but is stale (closed/errored/leaving) — clean up before re-subscribing
-      const handler = groupMessageHandlers.get(groupId);
-      if (handler) {
-        existingCh.off("new_message", handler);
-        groupMessageHandlers.delete(groupId);
-      }
-      groupChannels.delete(groupId);
-      socket.removeChannel(`group:${groupId}`);
+    const existing = receivers.get(groupId);
+    if (existing && existing.socket === current) {
+      if (isReceiverReady(groupId)) return Promise.resolve();
+      // One attempt per connection: coalesce instead of adding a second join.
+      if (!existing.done && !existing.ready) return existing.settled;
     }
+    if (existing) retire(existing);
 
-    const ch = socket.channel(`group:${groupId}`);
+    const channel = current.channel(`group:${groupId}`);
+    let settle = (): void => {};
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const receiver: GroupReceiver = {
+      groupId,
+      socket: current,
+      channel,
+      handler: null,
+      lifecycle: null,
+      ready: false,
+      done: false,
+      settled,
+      settle,
+    };
+    receivers.set(groupId, receiver);
+    watch(receiver);
+    void receive(receiver);
+    return settled;
+  }
+
+  /** Waits for the current receiver to be ready; resolves with the truth either way. */
+  async function awaitReceiverReady(
+    groupId: string,
+    timeoutMs: number,
+  ): Promise<ReceiverReadiness> {
+    if (isReceiverReady(groupId)) return { ready: true };
+
+    const pending = subscribeToGroup(groupId);
+    const raced = receivers.get(groupId);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<ReceiverReadiness>((resolve) => {
+      timer = setTimeout(
+        () =>
+          resolve({
+            ready: false,
+            reason: `no acknowledged group receiver within ${timeoutMs}ms of the accepted join`,
+          }),
+        timeoutMs,
+      );
+    });
+
     try {
-      await ch.join();
-      groupChannels.set(groupId, ch);
-
-      // Store handler reference for cleanup (Fix 4 + Fix 6: stronger runtime validation)
-      const messageHandler = (payload: unknown) => {
-        const msg = payload as Record<string, unknown>;
-        if (
-          msg &&
-          typeof msg === "object" &&
-          typeof msg.id === "string" &&
-          "group_id" in msg &&
-          msg.group_id === groupId
-        ) {
-          messageBuffer.addGroupMessage(groupId, payload as MessageDataResponse);
-        }
-      };
-      ch.on("new_message", messageHandler);
-      groupMessageHandlers.set(groupId, messageHandler);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[meshimize-ws] Failed to join group channel ${groupId}: ${errMsg}`);
+      return await Promise.race([
+        pending.then<ReceiverReadiness>(() =>
+          isReceiverReady(groupId)
+            ? { ready: true }
+            : { ready: false, reason: describeUnready(groupId) },
+        ),
+        deadline,
+      ]);
+    } finally {
+      clearTimeout(timer);
+      // A timed-out attempt must not swallow a later explicit recovery attempt.
+      if (raced && !raced.ready && receivers.get(groupId) === raced) retire(raced);
     }
   }
 
-  async function unsubscribeFromGroup(groupId: string): Promise<void> {
-    const ch = groupChannels.get(groupId);
-    if (ch) {
-      // Remove handler before leaving to prevent accumulation (Fix 4)
-      const handler = groupMessageHandlers.get(groupId);
-      if (handler) {
-        ch.off("new_message", handler);
-        groupMessageHandlers.delete(groupId);
+  /** True only for an acknowledged group channel with a handler on the live socket. */
+  function isReceiverReady(groupId: string): boolean {
+    const current = socket;
+    const receiver = receivers.get(groupId);
+    return (
+      current !== null &&
+      receiver !== undefined &&
+      receiver.socket === current &&
+      receiver.ready &&
+      receiver.handler !== null &&
+      current.getState() === "connected" &&
+      receiver.channel.getState() === "joined"
+    );
+  }
+
+  function describeUnready(groupId: string): string {
+    const current = socket;
+    if (!current) return "the WebSocket service is stopped";
+    if (current.getState() !== "connected") return `the WebSocket is ${current.getState()}`;
+    const receiver = receivers.get(groupId);
+    if (!receiver) return "no group receiver attempt is current for this connection";
+    if (receiver.channel.getState() === "errored")
+      return "the server rejected the group channel join";
+    return `the group channel is ${receiver.channel.getState()} without an attached answer handler`;
+  }
+
+  /** Watches server-initiated channel lifecycle events; either one invalidates delivery. */
+  function watch(receiver: GroupReceiver): void {
+    const lifecycle = (): void => {
+      retire(receiver);
+    };
+    receiver.lifecycle = lifecycle;
+    receiver.channel.on("phx_error", lifecycle);
+    receiver.channel.on("phx_close", lifecycle);
+  }
+
+  /** Attaches the shared-buffer handler. Only ever called after an acknowledgement. */
+  function attach(receiver: GroupReceiver): void {
+    const groupId = receiver.groupId;
+    const handler = (payload: unknown) => {
+      const msg = payload as Record<string, unknown>;
+      if (
+        msg &&
+        typeof msg === "object" &&
+        typeof msg.id === "string" &&
+        "group_id" in msg &&
+        msg.group_id === groupId
+      ) {
+        messageBuffer.addGroupMessage(groupId, payload as MessageDataResponse);
       }
-      await ch.leave();
-      groupChannels.delete(groupId);
-      // Remove channel from socket to prevent reuse with stale state
-      if (socket) {
-        socket.removeChannel(`group:${groupId}`);
+    };
+    receiver.handler = handler;
+    receiver.channel.on("new_message", handler);
+  }
+
+  async function receive(receiver: GroupReceiver): Promise<void> {
+    const { channel } = receiver;
+    const current = receiver.socket;
+    try {
+      if (channel.getState() === "joining") {
+        // Coalesce with a join already in flight instead of adding a duplicate one.
+        await channel.pendingJoin();
+      } else if (channel.getState() !== "joined") {
+        await channel.join();
       }
-      messageBuffer.clearGroup(groupId);
+      if (
+        receiver.done ||
+        socket !== current ||
+        current.getState() !== "connected" ||
+        channel.getState() !== "joined"
+      ) {
+        throw new Error("group channel is not acknowledged on the current connection");
+      }
+      attach(receiver);
+      receiver.ready = true;
+    } catch {
+      // Not ready: callers report the truth instead of assuming delivery.
+    } finally {
+      receiver.done = true;
+      if (!receiver.ready) retire(receiver);
+      receiver.settle();
     }
+  }
+
+  /** Drops a receiver's claims (handlers, readiness) without touching the socket. */
+  function detach(receiver: GroupReceiver): void {
+    receiver.done = true;
+    receiver.ready = false;
+    if (receiver.handler) {
+      receiver.channel.off("new_message", receiver.handler);
+      receiver.handler = null;
+    }
+    if (receiver.lifecycle) {
+      receiver.channel.off("phx_error", receiver.lifecycle);
+      receiver.channel.off("phx_close", receiver.lifecycle);
+      receiver.lifecycle = null;
+    }
+  }
+
+  /** Drops a receiver claim and its channel, so a later attempt starts a fresh join. */
+  function retire(receiver: GroupReceiver): void {
+    detach(receiver);
+    receiver.channel.resetState();
+    // Only the current attempt owns the socket's channel for this topic; a stale
+    // attempt must never remove a newer attempt's channel.
+    if (receivers.get(receiver.groupId) === receiver) {
+      receivers.delete(receiver.groupId);
+      receiver.socket.removeChannel(`group:${receiver.groupId}`);
+    }
+    receiver.settle();
+  }
+
+  function invalidateReceivers(): void {
+    for (const receiver of Array.from(receivers.values())) retire(receiver);
+  }
+
+  async function unsubscribeFromGroup(groupId: string): Promise<void> {
+    const receiver = receivers.get(groupId);
+    if (!receiver) return;
+
+    detach(receiver);
+    // Leave before dropping channel state so the server learns about the intent.
+    await receiver.channel.leave();
+    retire(receiver);
+    messageBuffer.clearGroup(groupId);
   }
 
   function handleDelegationEvent(payload: unknown): void {
@@ -292,12 +466,12 @@ export function createWsService(deps: WsManagerDeps): WsService {
     }
     shutdownHandlersBound = false;
 
+    invalidateReceivers();
+
     if (socket) {
       socket.disconnect();
       socket = null;
     }
-    groupChannels.clear();
-    groupMessageHandlers.clear();
     _identityChannel = null;
     accountDmHandler = null;
     accountDelegationCreatedHandler = null;
@@ -310,6 +484,8 @@ export function createWsService(deps: WsManagerDeps): WsService {
     stop,
     subscribeToGroup,
     unsubscribeFromGroup,
+    isReceiverReady,
+    awaitReceiverReady,
     getSocket: () => socket,
   };
 }
