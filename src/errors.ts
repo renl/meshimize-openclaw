@@ -63,6 +63,20 @@ function isNetworkError(error: Error): boolean {
 }
 
 /**
+ * Error carrying already-final operator guidance for a join write whose outcome
+ * is known or uncertain (OpenClaw §4.4.1 refusal/uncertainty rows).
+ *
+ * Kept distinct from generic errors so its recovery instructions survive
+ * formatting instead of being rewritten into a transport-only message.
+ */
+export class JoinWriteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JoinWriteError";
+  }
+}
+
+/**
  * Maps any error thrown during tool execution to a "Meshimize:"-prefixed
  * user-friendly error message.
  *
@@ -71,6 +85,11 @@ function isNetworkError(error: Error): boolean {
  * @returns A formatted error string suitable for errorResult()
  */
 export function formatToolError(error: unknown, baseUrl: string): string {
+  // 0. Join-write guidance is authoritative; never reduce it to a transport message.
+  if (error instanceof JoinWriteError) {
+    return `Meshimize: ${error.message}`;
+  }
+
   // 1. MeshimizeAPIError — map by HTTP status
   if (error instanceof MeshimizeAPIError) {
     const status = error.status;
