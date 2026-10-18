@@ -1,5 +1,7 @@
 # OpenClaw04 test-environment preparation
 
+04u [private-proof fixture](private-owner-join-04u-private-fixture.md): `.worktree/private-owner-join-04u-private-fixture` / same branch / runnable private proof setup / SDET / active; prerequisite441f665. Next: review runnable setup before postimplementation execution, pin functional chain. Cleanup: retained; not landed/abandoned. No private PASS claim.
+
 04u correction1 adds [immutable contract fixture](private-owner-join-04u-contract-fixture.md), path/branch `.worktree/private-owner-join-04u-contract-fixture` / same; change=test-only contracts; owner=SDET; status=active; baseline6fdf93c. Next: pin tested helper then private-proof fixture and functional chain for Architect review. Cleanup: retain; not landed/abandoned. No helper merge wait or main promotion.
 
 ## Receiver partition (approved available immutable chain; narrow Architect review pending)

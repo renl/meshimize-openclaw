@@ -216,9 +216,9 @@ try {
       "-v",
       `${out}:/proof`,
       runtime,
-      "node",
-      "--check",
-      "/proof/receiver.mjs",
+      "sh",
+      "-c",
+      "node --check /proof/receiver.mjs && node --check /proof/private-workflow.mjs",
     ]);
     const r = docker(["start", "-a", check], 30, true);
     writeFileSync(join(out, "fixture.log"), r.text);
@@ -298,7 +298,8 @@ try {
       "OPENCLAW_CONFIG_PATH=/isolated-home/.openclaw/openclaw.json",
       runtime,
       "node",
-      "/proof/baseline.mjs",
+      mode.startsWith("private-") ? "/proof/private-workflow.mjs" : "/proof/baseline.mjs",
+      ...(mode.startsWith("private-") ? [mode.slice(8)] : []),
     ]);
     docker(["network", "connect", "bridge", app]);
     const r = docker(["start", "-a", probe], 300, true);
