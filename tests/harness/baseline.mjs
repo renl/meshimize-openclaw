@@ -208,7 +208,7 @@ try {
     [
       "plugins",
       "install",
-      "/proof/candidate/meshimize-openclaw-plugin-0.1.14.tgz",
+      `/proof/candidate/meshimize-openclaw-plugin-${JSON.parse(readFileSync("/proof/candidate/package.json")).version}.tgz`,
       "--force",
       "--accept-capabilities",
     ],
