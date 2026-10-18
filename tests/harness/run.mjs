@@ -123,7 +123,9 @@ try {
   ])
     cpSync(join(source, p), join(candidate, p), { recursive: true });
   hashTree(candidate, "candidate");
-  for (const input of manifest.modes[mode]) {
+  // Fixture readiness validates every preserved pin, without asserting receiver correctness.
+  const inputs = mode === "fixture" ? Object.values(manifest.modes).flat() : manifest.modes[mode];
+  for (const input of inputs) {
     const bytes = input.commit
       ? spawnSync("git", ["-C", home, "show", `${input.commit}:${input.path}`], { timeout: 10000 })
           .stdout
@@ -193,7 +195,20 @@ try {
     const r = docker(["start", "-a", test], 90, true);
     writeFileSync(join(out, "units.log"), r.text);
     evidence.assertion = r.ok ? "PASS" : "FAIL";
-  } else if (["wire", "safety"].includes(mode)) {
+  } else if (mode === "fixture") {
+    const check = create("fixture", [
+      "--network=none",
+      "-v",
+      `${out}:/proof`,
+      runtime,
+      "node",
+      "--check",
+      "/proof/receiver.mjs",
+    ]);
+    const r = docker(["start", "-a", check], 30, true);
+    writeFileSync(join(out, "fixture.log"), r.text);
+    evidence.assertion = r.ok ? "PASS" : "FAIL";
+  } else if (["wire", "safety", "receiver"].includes(mode)) {
     const test = create("wire", [
       "--network=none",
       "-v",

@@ -1,5 +1,12 @@
 # OpenClaw04 test-environment preparation
 
+## Receiver partition (approved available immutable chain; narrow Architect review pending)
+
+| Spec                                                                       | Path / branch / change / owner / status                                                                                                                               | Next action / cleanup evidence                                                                                                                                                                                    |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [04t fixture](private-owner-join-04t-receiver-fixture.md), baseline748768d | `repos/meshimize-openclaw/.worktree/private-owner-join-04t-receiver-fixture` / `private-owner-join-04t-receiver-fixture` / receiver test prerequisite / SDET / active | Standalone fixture integrity + regression322 + installed public baseline; no receiver-green claim. SE git-only persistence/PR after narrow review; cleanup pending landing/promotion.                             |
+| Functional04b, chain on exact04tSHA (consumer index records pin)           | `repos/meshimize-openclaw/.worktree/private-owner-join-04b-receiver-functional` / `private-owner-join-04b-receiver-functional` / receiver correction / SDET / planned | Copy five production files byte-identical to45686cc; receiver9/safety13/regression322/installed public baseline gates; cleanup pending landing/promotion. Original04b-chain45686cc retained recovery, no removal. |
+
 ## Active implementation handoff
 
 | Spec / baseline                                                                      | Path / branch / change / owner / status                                                                                                                                        | Next action / cleanup evidence                                                                                                                                                                          |
