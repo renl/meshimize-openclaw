@@ -1,0 +1,47 @@
+{
+  "candidate": "1e7ee434a8c05fdb4050a19e6f17f5f97a4cf204",
+  "modes": {
+    "regression": [],
+    "wire": [
+      {
+        "path": "tests/harness/wire.mjs",
+        "target": "wire.mjs",
+        "sha256": "ddf690de0371f49384f60aa5cf726c8af4138b4507d5e6bf80dedd3a22edf533"
+      }
+    ],
+    "baseline": [
+      {
+        "commit": "5520c841e69974ac53618efac84141ba5d4fe3f1",
+        "path": "tests/harness/baseline.mjs",
+        "target": "baseline.mjs",
+        "sha256": "895ab559bcc6c2bcbc79e832dd6d4abed84216c4e9774c8395e23d49b8dbe942"
+      }
+    ],
+    "units": [
+      {
+        "commit": "2de80b37e1619485684beb6b8577a2d4024cfa0b",
+        "path": "tests/tools/private-known-id.test.ts",
+        "target": "candidate/tests/tools/private-known-id.test.ts",
+        "sha256": "9eb8d2c98482478336e862ecc049bed0b599e4509e28bb5a5fc320fb7a74d03d"
+      },
+      {
+        "commit": "2de80b37e1619485684beb6b8577a2d4024cfa0b",
+        "path": "tests/api/join-single-attempt.test.ts",
+        "target": "candidate/tests/api/join-single-attempt.test.ts",
+        "sha256": "612d6cecb42e183c856a25119a42f0867506e55e9b624cf76a5a921a46935d36"
+      },
+      {
+        "commit": "2de80b37e1619485684beb6b8577a2d4024cfa0b",
+        "path": "tests/identity-pending.test.ts",
+        "target": "candidate/tests/identity-pending.test.ts",
+        "sha256": "01ddc6c5b629f74cb94f1744f2d86e2ea9f6fb03cebe23b4f3af5a242a7fc8db"
+      },
+      {
+        "commit": "e9b2b761acd79ca4655d7c06744e6a1b69416555",
+        "path": "tests/services/private-receiver.test.ts",
+        "target": "candidate/tests/services/private-receiver.test.ts",
+        "sha256": "a224beafae171f407d0434f4eb54a2448b4b8aa013977c781bb711b6acf3bea0"
+      }
+    ]
+  }
+}
