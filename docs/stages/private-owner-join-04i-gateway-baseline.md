@@ -1,0 +1,34 @@
+# OpenClaw04 real installed public baseline
+
+SDET-owned executable baseline; **baselinePASS, review-ready only**. Parent root `docs/stages/README.md`; authority current root OpenClaw architecture §4.4.2–3. No private-feature verification or implementation authorization.
+
+## Goal / baseline / files
+
+Prove the actual pinned OpenClaw Gateway can install/load the unchanged local0.1.14 candidate, start its receiver, select the key’s acting identity and return a useful public answer through its supported public tool endpoint. This is direct public-runtime compatibility proof, only supporting/proxy evidence for founder success: useful authorized private Q&A with only the intended identity joined.
+
+- Worktree/branch `repos/meshimize-openclaw/.worktree/private-owner-join-04i-gateway-baseline` / `private-owner-join-04i-gateway-baseline`; preparation baseline `1e7ee434a8c05fdb4050a19e6f17f5f97a4cf204`; SDET owner, blocked/retained until review/landing disposition.
+- Exact files: `tests/harness/baseline.mjs`, this brief, local index. ~378 executable lines; no production/version/lock edits. Maximum600 delta/20files.
+- Prerequisite04h finite environment runner and provisioned runtime. Current04h calls this readable peer file; no shared landing or approved pinned implementation chain is implied. Integration baseline/layout must be confirmed through CoS before landing. Consumers04/04b use this as a prerequisite spike; after implementation SDET repins/repeats it on combined candidate.
+
+## Run sequence / evidence
+
+From sibling04h worktree: `node tests/harness/run.mjs baseline` (PowerShell/Windows finite Node supervisor → Linux Docker).04h owns exact startup/readiness/exit/cleanup bounds. No foreground server, host HOME/config access, production credentials or LLM invocation. Format `npm run format`, gate `npm run format:check`; current exact files formatted with the locked candidate Prettier inside pinned Docker.
+
+1. Locked satellite dependencies, scripts disabled, build and pack; official `openclaw plugins install <local.tgz> --force --accept-capabilities`. Reviewed manifest declares the21 existing tools, no hooks/provider/model/subagent grants; consent applies only to disposable container state. This normal documented install consent is not a feature bug or approval redesign. No script enabling.
+2. Disposable public REST account/default creator/separate acting identity/keys/group; local config with `plugins.allow:["meshimize"]`, enabled entry, acting key, local base URL; `tools.alsoAllow:["meshimize"]`. Separate ephemeral Gateway token. Tokens/content held only in memory or isolated container config, scrubbed before log writes.
+3. `plugins inspect meshimize --runtime --json` supports the21-name assertion, but is not service proof. Start actual `openclaw gateway run --bind loopback --port18789` (separate arguments `--port 18789` in executable). Actual Gateway log establishes plugin load and acting identity. Transparent HTTP/WS observer forwards real fixture traffic unchanged; matched successful identity-channel join reply establishes receiver started by Gateway. No mocked register/import/internal service-start call.
+4. Bearer-authenticated `POST /tools/invoke` invokes `meshimize_list_my_groups` under real tool policy and proves empty acting memberships. Authorized responder joins public group before question. Actual plugin request/approve → one observed join POST → current group join reply → actual plugin ask → correlated fact returned with expected responder identity/group/question ID. Independent member read confirms acting member and unchanged creator owner, exactly2 memberships. Never creates/prejoins either later private-proof target identity.
+5. Keys/groups removed publicly; responder/proxy/socket/process closed;04h destroys/absence-checks all containers/network/DB state. Assertion and cleanup statuses separate. Candidate artifacts/dependencies/evidence intentionally retained project-locally.
+
+Latest completed baseline `meshimize-oc04-b782c795`: **8 assertion checkpointsPASS, cleanupPASS, exit0**,64.5s supervisor. Actual pack SHA256 `a32597b2c1462ebc801159088ae15f9fdb36a91fa36b6e376ff71d47ad502a61`; runtime local image ID5c2b8f89, server local image ID4a77a71f (full IDs in04h spec/evidence). Minimum sampled Docker free4,096,152KiB; preflight4,225,772KiB, above1.5GiB floor. Earlier strengthened baselineb99bf152 and initial6f79c300 alsoPASS; no source/artifact drift. No npm publication identity equivalence claimed.
+
+Evidence root `_build/sdet-local/openclaw04/runs/<run>/`: `evidence.json` hashes/commands/exits/capacity, `result.json` checks/topics/count, redacted Gateway/CLI logs, exact candidate source/lock/archive. Earlier ab0433e8 lacked documented capability consent;599077c6 mistakenly expected a nonexistent success log; c9a8b4ad blocked the observer event loop with synchronous inspect. These are retained **harness failures**, corrected without production edits; no platform/network defect attribution or host variability was found.
+
+## Boundary Verification / source gates
+
+- OpenClaw2026.10.4/source `383c124cc32ffee3f8e56f549b88da94d269a4af`, Node24.16.0. DevOps `docs/operations/openclaw04-runtime.md` and runtime evidence retain SRI/lock/scripts/image/version/help. Immutable official install/manage docs and `src/gateway/tools-invoke-http.ts`, `tools-invoke-shared.ts` retained at root evidence `source/`. Hash packet retained; Architect still owns stronger resolver/equivalence interpretation.
+- Gateway uses loopback port18789, `POST /tools/invoke`, separate bearer Gateway operator token, JSON `{tool,args,sessionKey:"main"}`; official200 `{ok:true,result}`; errors per pinned docs. Plugin success is JSON in `content[0].text`; errors are `details.error:true` (not MCP `isError`). `tools.alsoAllow` retains actual policy, no global disable/allow-all bypass.
+- Fixture join uses Meshimize bearer key and no body/identity override. Physical WS URL `/api/v1/ws/websocket?token=<key>&vsn=2.0.0`; only correlated successful join replies count. Observer retains topic/count, never raw headers/frame/content. Answer checks source-faithful sender/parent correlation via public output. Local deterministic responder proves delivery, not real provider retrieval.
+- Local archive warns provenance-invalid/untrusted but loads under explicit allow/consent; no false claim of verified npm/ClawHub trust. No service-v2 migration, new platform API or registration change needed for baseline.
+- Gateway operator token invocation **does not prove conversational human approval**, model selection or production/published/private-workflow readiness. Those gates remain later.
+- Decomposition triggers1–5YES; interface-fidelity/decomposition review required through CoS. Cleanup of run resourcesPASS; worktree retained until authorized landing/abandonment. No PR/publish/merge/deploy.
