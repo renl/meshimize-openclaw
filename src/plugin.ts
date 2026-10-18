@@ -35,6 +35,13 @@ import { errorResult, formatToolError } from "./errors.js";
 let sharedMessageBuffer: MessageBuffer | null = null;
 let sharedDelegationBuffer: DelegationContentBuffer | null = null;
 let sharedPendingJoinMap: ReturnType<typeof createPendingJoinMap> | null = null;
+/**
+ * Identity scope (base URL + API key) that owns the current pending-join map.
+ * OpenClaw selects exactly one acting identity per client instance through its
+ * API key, so a re-registration under a different key must not inherit another
+ * identity's operator approvals.
+ */
+let pendingJoinScope: string | null = null;
 let wsServiceInstance: WsService | null = null;
 let runtimeIdentityContext: RuntimeIdentityContext | null = null;
 let startupPromise: Promise<RuntimeIdentityContext> | null = null;
@@ -93,6 +100,7 @@ export function resetSharedState(): void {
   sharedMessageBuffer = null;
   sharedDelegationBuffer = null;
   sharedPendingJoinMap = null;
+  pendingJoinScope = null;
   wsServiceInstance = null;
   runtimeIdentityContext = null;
   startupPromise = null;
@@ -102,6 +110,15 @@ export function resetSharedState(): void {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
+ * Identity scope for operator-approved state: one acting identity per API key.
+ * The Gateway calls register() again per session and after a key change, and an
+ * inherited approval from another identity must never become actionable.
+ */
+function identityScopeKey(config: Config): string {
+  return `${config.baseUrl}\u0000${config.apiKey}`;
 }
 
 function isRetryableStartupError(error: Error): boolean {
@@ -313,8 +330,21 @@ export function register(api: PluginAPI): void {
   if (!sharedDelegationBuffer) {
     sharedDelegationBuffer = new DelegationContentBuffer();
   }
+
+  // A re-registration under a different API key is a different acting identity:
+  // its retained registries must not inherit another identity's approved request.
+  const scope = identityScopeKey(config);
+  if (sharedPendingJoinMap && pendingJoinScope !== null && pendingJoinScope !== scope) {
+    sharedPendingJoinMap.dispose();
+    sharedPendingJoinMap = null;
+    console.warn(
+      "[meshimize] Acting identity changed on re-registration: pending join requests " +
+        "from the previous API key were cleared and must be requested again.",
+    );
+  }
   if (!sharedPendingJoinMap) {
     sharedPendingJoinMap = createPendingJoinMap(PENDING_JOIN_DEFAULTS);
+    pendingJoinScope = scope;
   }
 
   // Create and register the background WS service only once.
