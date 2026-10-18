@@ -1,5 +1,7 @@
 # OpenClaw04 test-environment preparation
 
+04u correction1 adds [immutable contract fixture](private-owner-join-04u-contract-fixture.md), path/branch `.worktree/private-owner-join-04u-contract-fixture` / same; change=test-only contracts; owner=SDET; status=active; baseline6fdf93c. Next: pin tested helper then private-proof fixture and functional chain for Architect review. Cleanup: retain; not landed/abandoned. No helper merge wait or main promotion.
+
 ## Receiver partition (approved available immutable chain; narrow Architect review pending)
 
 Independent combined verification at51c27cb: receiver9 (04caae32), safety13 (f57d1b7a), regression322 (b7e435f4), installed public8 (53641701), all assertions/cleanup PASS. Fixture pin a793f11 standalone integrity/regression322/public8 PASS; details in functional brief. No full private-workflow or release-ready claim; CoS narrow Architect partition/plugin review still required before SE git-only PR handoffs.

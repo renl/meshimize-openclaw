@@ -87,7 +87,7 @@ function space(stage) {
   (evidence.space ??= []).push({ stage, freeKiB: free });
   docker(["rm", name]);
   containers.pop();
-  if (!Number.isFinite(free) || free < 1572864) throw Error("1.5GiB capacity floor");
+  if (!Number.isFinite(free) || free < 4194304) throw Error("4GiB capacity floor");
   if (evidence.space[0].freeKiB - free > 4194304) throw Error("4GiB run storage budget");
 }
 try {
@@ -160,9 +160,19 @@ try {
       ),
     )
     .digest("hex");
-  if (["units", "regression"].includes(mode)) {
+  if (["units", "regression", "pending"].includes(mode)) {
     cpSync(join(source, "tests"), join(candidate, "tests"), { recursive: true });
     cpSync(join(source, "vitest.config.ts"), join(candidate, "vitest.config.ts"));
+    if (mode === "pending") {
+      cpSync(
+        join(candidate, "tests/tools/known-pending.contract.ts"),
+        join(candidate, "tests/tools/known-pending-contract.test.ts"),
+      );
+      cpSync(
+        join(candidate, "tests/identity-pending.contract.ts"),
+        join(candidate, "tests/identity-pending-contract.test.ts"),
+      );
+    }
     hashTree(join(candidate, "tests"), "tests");
     const test = create("units", [
       "--network=none",
@@ -181,14 +191,19 @@ try {
             "node",
             "node_modules/vitest/vitest.mjs",
             "run",
-            ...(mode === "units"
+            ...(mode === "pending"
               ? [
-                  "tests/tools/private-known-id.test.ts",
-                  "tests/api/join-single-attempt.test.ts",
-                  "tests/identity-pending.test.ts",
-                  "tests/services/private-receiver.test.ts",
+                  "tests/tools/known-pending-contract.test.ts",
+                  "tests/identity-pending-contract.test.ts",
                 ]
-              : []),
+              : mode === "units"
+                ? [
+                    "tests/tools/private-known-id.test.ts",
+                    "tests/api/join-single-attempt.test.ts",
+                    "tests/identity-pending.test.ts",
+                    "tests/services/private-receiver.test.ts",
+                  ]
+                : []),
             "--reporter=verbose",
           ]),
     ]);

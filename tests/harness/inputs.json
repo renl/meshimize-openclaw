@@ -17,6 +17,7 @@
       }
     ],
     "regression": [],
+    "pending": [],
     "wire": [
       {
         "path": "tests/harness/wire.mjs",
