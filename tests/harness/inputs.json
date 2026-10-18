@@ -1,6 +1,14 @@
 {
-  "candidate": "1e7ee434a8c05fdb4050a19e6f17f5f97a4cf204",
+  "candidate": "748768d25d84532b3034a5bef751ffda0d22e432",
   "modes": {
+    "fixture": [],
+    "receiver": [
+      {
+        "path": "tests/harness/receiver.mjs",
+        "target": "receiver.mjs",
+        "sha256": "1a23e02749e13e5269dfb099d1813f44bb92fc24f8d0ea2fcabacdcb35a6b496"
+      }
+    ],
     "safety": [
       {
         "path": "tests/harness/safety.mjs",
