@@ -137,19 +137,54 @@ try {
     writeFileSync(target, bytes);
     evidence.inputs[input.path] = input.sha256;
   }
-  const build = create("pack", [
-    "-v",
-    `${candidate}:/candidate`,
-    "-w",
-    "/candidate",
-    runtime,
-    "sh",
-    "-c",
-    "npm ci --ignore-scripts --no-audit --no-fund && npm run build && npm pack --ignore-scripts --json",
-  ]);
-  const built = docker(["start", "-a", build], 180, true);
-  writeFileSync(join(out, "pack.log"), built.text);
-  if (!built.ok) throw Error("candidate build/pack failed");
+  const reuse = process.argv[4];
+  let dependencyMount = [];
+  if (reuse) {
+    // Unchanged-production checks may reuse a preserved build; never mutate it.
+    const prior = JSON.parse(readFileSync(join(reuse, "evidence.json")));
+    if (prior.runtime !== runtime || prior.cleanup !== "PASS") throw Error("reuse provenance");
+    for (const [key, hash] of Object.entries(evidence.inputs)) {
+      if (key.startsWith("candidate/") && prior.inputs[key] !== hash)
+        throw Error(`reuse source drift: ${key}`);
+    }
+    const old = join(reuse, "candidate");
+    const tar = `meshimize-openclaw-plugin-${JSON.parse(readFileSync(join(candidate, "package.json"))).version}.tgz`;
+    if (
+      createHash("sha256")
+        .update(readFileSync(join(old, tar)))
+        .digest("hex") !== prior.artifactSHA256
+    )
+      throw Error("reuse artifact drift");
+    cpSync(join(old, "dist"), join(candidate, "dist"), { recursive: true });
+    cpSync(join(old, tar), join(candidate, tar));
+    dependencyMount = [
+      "-v",
+      `${join(old, "node_modules")}:/proof/candidate/node_modules:ro`,
+      "--tmpfs",
+      "/proof/candidate/node_modules/.vite-temp",
+      "--tmpfs",
+      "/proof/candidate/node_modules/.vite",
+    ];
+    evidence.reusedBuild = {
+      run: prior.run,
+      artifactSHA256: prior.artifactSHA256,
+      reason: "unchanged source; preserve 4GiB floor",
+    };
+  } else {
+    const build = create("pack", [
+      "-v",
+      `${candidate}:/candidate`,
+      "-w",
+      "/candidate",
+      runtime,
+      "sh",
+      "-c",
+      "npm ci --ignore-scripts --no-audit --no-fund && npm run build && npm pack --ignore-scripts --json",
+    ]);
+    const built = docker(["start", "-a", build], 180, true);
+    writeFileSync(join(out, "pack.log"), built.text);
+    if (!built.ok) throw Error("candidate build/pack failed");
+  }
   evidence.artifactSHA256 = createHash("sha256")
     .update(
       readFileSync(
@@ -178,6 +213,7 @@ try {
       "--network=none",
       "-v",
       `${out}:/proof`,
+      ...dependencyMount,
       "-w",
       "/proof/candidate",
       runtime,
@@ -216,18 +252,19 @@ try {
       "-v",
       `${out}:/proof`,
       runtime,
-      "node",
-      "--check",
-      "/proof/receiver.mjs",
+      "sh",
+      "-c",
+      "node --check /proof/receiver.mjs && node --check /proof/private-workflow.mjs",
     ]);
     const r = docker(["start", "-a", check], 30, true);
     writeFileSync(join(out, "fixture.log"), r.text);
     evidence.assertion = r.ok ? "PASS" : "FAIL";
-  } else if (["wire", "safety", "receiver"].includes(mode)) {
+  } else if (["wire", "safety", "receiver", "pending-wire"].includes(mode)) {
     const test = create("wire", [
       "--network=none",
       "-v",
       `${out}:/proof`,
+      ...dependencyMount,
       runtime,
       "node",
       "--test",
@@ -298,7 +335,8 @@ try {
       "OPENCLAW_CONFIG_PATH=/isolated-home/.openclaw/openclaw.json",
       runtime,
       "node",
-      "/proof/baseline.mjs",
+      mode.startsWith("private-") ? "/proof/private-workflow.mjs" : "/proof/baseline.mjs",
+      ...(mode.startsWith("private-") ? [mode.slice(8)] : []),
     ]);
     docker(["network", "connect", "bridge", app]);
     const r = docker(["start", "-a", probe], 300, true);
@@ -308,6 +346,8 @@ try {
   space("after-test");
 } catch (e) {
   evidence.failure = e.message;
+  evidence.assertionBeforeHarnessFailure = evidence.assertion;
+  evidence.assertion = "BLOCKED";
 } finally {
   let clean = true;
   for (const c of containers.reverse()) {
