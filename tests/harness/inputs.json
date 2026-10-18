@@ -1,6 +1,13 @@
 {
   "candidate": "1e7ee434a8c05fdb4050a19e6f17f5f97a4cf204",
   "modes": {
+    "safety": [
+      {
+        "path": "tests/harness/safety.mjs",
+        "target": "safety.mjs",
+        "sha256": "da289cce2ac557969f1430ff3a515b22e8c7d4a5d640e55ccd61c3f05717b3f9"
+      }
+    ],
     "regression": [],
     "wire": [
       {
