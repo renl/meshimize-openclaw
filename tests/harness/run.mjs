@@ -4,6 +4,7 @@ import { mkdirSync, cpSync, writeFileSync, readFileSync, readdirSync } from "nod
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
+import { selectImages } from "./image-selection.mjs";
 const home = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const source = home;
 const manifest = JSON.parse(readFileSync(join(home, "tests/harness/inputs.json")));
@@ -14,8 +15,8 @@ const mode = process.argv[2] ?? "baseline";
 if (!manifest.modes[mode]) throw Error("Unknown manifest mode");
 mkdirSync(out, { recursive: true });
 const env = { ...process.env, DOCKER_CONFIG: join(root, "_build/sdet-local/docker") };
-const runtime = "sha256:5c2b8f89fa8d40ec311a1d42f5871c6d9d3274182e18d837a667597556673084";
-const server = "sha256:4a77a71f0e3290f0158bd94362db48abe6b7d2eb0c8cc15eaf6195307b6f55d3";
+const images = selectImages(env);
+const { runtime, server, postgres } = images;
 const containers = [];
 let network = false;
 const evidence = {
@@ -23,6 +24,13 @@ const evidence = {
   mode,
   runtime,
   server,
+  images,
+  harnessSHA256: createHash("sha256")
+    .update(readFileSync(fileURLToPath(import.meta.url)))
+    .digest("hex"),
+  imageSelectionSHA256: createHash("sha256")
+    .update(readFileSync(new URL("./image-selection.mjs", import.meta.url)))
+    .digest("hex"),
   candidate: process.argv[3] ?? manifest.candidate,
   assertion: "BLOCKED",
   cleanup: "NOT_RUN",
@@ -60,6 +68,7 @@ function create(suffix, args) {
   containers.push(name);
   docker([
     "create",
+    "--pull=never",
     "--name",
     name,
     "--memory=4g",
@@ -91,6 +100,10 @@ function space(stage) {
   if (evidence.space[0].freeKiB - free > 4194304) throw Error("4GiB run storage budget");
 }
 try {
+  if (images.replacement)
+    for (const image of [runtime, server, postgres])
+      if (docker(["image", "inspect", image, "--format", "{{.Id}}"]).value !== image)
+        throw Error("replacement image identity mismatch");
   if (cmd("git", ["-C", source, "rev-parse", "HEAD"]).value !== evidence.candidate)
     throw Error("candidate drift");
   cmd("git", [
@@ -287,7 +300,7 @@ try {
       "POSTGRES_PASSWORD=disposable",
       "-e",
       "POSTGRES_DB=meshimize_oc04",
-      "postgres:16",
+      postgres,
     ]);
     docker(["start", db]);
     let ready = false;

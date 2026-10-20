@@ -1,5 +1,9 @@
 # OpenClaw04 test-environment preparation
 
+## Restored-image packet after PR27–29 landing
+
+[Recovery brief](private-owner-join-04v-image-recovery.md): path `.worktree/private-owner-join-04v-image-recovery`; branch same; change restored-image runner; owner SDET; status active/review-ready; baseline harness8b9a6fa (full tree equals independently testede4bd8d0). Next CoS narrow fidelity review→SE separate substantive harness PR, never closed27/28/29. Pure selector tests and unchanged full-proof evidence map in brief. Cleanup retained through own landing; no test service running. Root preservation `_build/sdet-local/openclaw27-29-landing-20261018/` includes dirty docs/ignored SDK; root stage index owns final original-worktree removal status. Main1e7ee434 unchanged, no release/public-guide completion.
+
 ## Prompt hotfix setup —2026-10-20
 
 | Spec                                                         | Path / branch / change / owner / status                                                                                   | Baseline / next action / cleanup evidence                                                                                                                                                                                              |
