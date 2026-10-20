@@ -1,5 +1,11 @@
 # OpenClaw04 test-environment preparation
 
+## Prompt hotfix setup —2026-10-20
+
+| Spec                                                         | Path / branch / change / owner / status                                                                                   | Baseline / next action / cleanup evidence                                                                                                                                                                                              |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [04w repeat prompt](private-owner-join-04w-repeat-prompt.md) | `.worktree/private-owner-join-04w-repeat-prompt` / same / unknown-repeat consent text / SDET / active, setup RED measured | harness `8b9a6fadd79d670c8c6bc244f74cc7b920993c32`; CoS→SE text-only correction;3PASS/1FAIL root `_build/sdet-local/repeat-prompt-setup/openclaw-red.log`; retain until verified harness landing, no cleanup performed. Main excluded. |
+
 ## 04u correction1 — review packet (supersedes earlier04u planning)
 
 Shared receiver/safety source6fdf93c; main unchanged1e7ee434. Approved **available immutable chain**, not helper-merge wait:
