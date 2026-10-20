@@ -212,6 +212,7 @@ export async function joinGroupHandler(args: { group_id: string }, deps: GroupTo
           `A join request for group ID ${existing.group_id} is already pending operator approval. ` +
           "Meshimize returned no verified public metadata for this ID, so its details and your " +
           `eligibility are unverified. ${UNKNOWN_GROUP_NOTICE} ` +
+          "Approval only attempts the join and may be denied. " +
           `The request ${existing.id} expires at ${existing.expires_at}.`,
       };
     }

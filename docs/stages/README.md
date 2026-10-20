@@ -4,6 +4,12 @@
 
 [Recovery brief](private-owner-join-04v-image-recovery.md): path `.worktree/private-owner-join-04v-image-recovery`; branch same; change restored-image runner; owner SDET; status active/review-ready; baseline harness8b9a6fa (full tree equals independently testede4bd8d0). Next CoS narrow fidelity review→SE separate substantive harness PR, never closed27/28/29. Pure selector tests and unchanged full-proof evidence map in brief. Cleanup retained through own landing; no test service running. Root preservation `_build/sdet-local/openclaw27-29-landing-20261018/` includes dirty docs/ignored SDK; root stage index owns final original-worktree removal status. Main1e7ee434 unchanged, no release/public-guide completion.
 
+## Prompt hotfix setup —2026-10-20
+
+| Spec                                                         | Path / branch / change / owner / status                                                                                   | Baseline / next action / cleanup evidence                                                                                                                                                                                              |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [04w repeat prompt](private-owner-join-04w-repeat-prompt.md) | `.worktree/private-owner-join-04w-repeat-prompt` / same / unknown-repeat consent text / SDET / active, setup RED measured | harness `8b9a6fadd79d670c8c6bc244f74cc7b920993c32`; CoS→SE text-only correction;3PASS/1FAIL root `_build/sdet-local/repeat-prompt-setup/openclaw-red.log`; retain until verified harness landing, no cleanup performed. Main excluded. |
+
 ## 04u correction1 — review packet (supersedes earlier04u planning)
 
 Shared receiver/safety source6fdf93c; main unchanged1e7ee434. Approved **available immutable chain**, not helper-merge wait:
